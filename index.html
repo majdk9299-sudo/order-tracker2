@@ -23,7 +23,7 @@
         .stats-row { display: flex; gap: 10px; margin-top: 20px; }
         .stat-tag { flex: 1; background: rgba(250,243,240,0.9); border-radius: 14px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
         .stat-num { font-size: 20px; font-weight: 800; color: #6B2737; }
-        .stat-label { font-size: 11px; color: #8B7377; }
+        .stat-label { font-size: 11px; color: #8B7377; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .filter-row { display: flex; gap: 8px; padding: 18px 20px 0; align-items: center; }
         .filter-btn { border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-family: 'Tajawal', sans-serif; cursor: pointer; }
         .filter-btn.active { background: #6B2737; color: #FAF3F0; border-color: #6B2737; }
@@ -78,6 +78,18 @@
         .image-viewer-close { position: absolute; top: 24px; left: 24px; background: rgba(255,255,255,0.15); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; display: flex; align-items: center; justify-content: center; }
         .images-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
         .form-images-row { display: flex; gap: 8px; overflow-x: auto; margin-top: 8px; }
+        .custom-prompt-overlay { position: fixed; inset: 0; background: rgba(43,31,34,0.5); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+        .custom-prompt-overlay.show { display: flex; }
+        .custom-prompt-card { background: #FAF3F0; width: 100%; max-width: 340px; border-radius: 22px; padding: 22px 20px 20px; box-shadow: 0 12px 30px rgba(43,31,34,0.25); text-align: center; animation: promptPop .18s ease-out; }
+        @keyframes promptPop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .custom-prompt-icon { width: 46px; height: 46px; border-radius: 14px; background: #F3DEE1; color: #6B2737; font-size: 22px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+        .custom-prompt-title { font-family: 'Amiri', serif; font-size: 19px; font-weight: 700; color: #6B2737; margin-bottom: 6px; }
+        .custom-prompt-text { color: #8B7377; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+        .custom-prompt-input { width: 100%; border: 1px solid #E7D3D6; background: #fff; border-radius: 12px; padding: 11px 12px; font-size: 15px; font-family: 'Tajawal', sans-serif; color: #2B1F22; outline: none; text-align: center; margin-bottom: 18px; }
+        .custom-prompt-input:focus { border-color: #C9A9AF; }
+        .custom-prompt-actions { display: flex; gap: 10px; }
+        .custom-prompt-cancel { flex: 1; background: #fff; color: #8B7377; border: 1px solid #E7D3D6; border-radius: 12px; padding: 11px 10px; font-size: 14px; font-family: 'Tajawal', sans-serif; font-weight: 700; cursor: pointer; }
+        .custom-prompt-ok { flex: 1; background: #6B2737; color: #FAF3F0; border: none; border-radius: 12px; padding: 11px 10px; font-size: 14px; font-family: 'Tajawal', sans-serif; font-weight: 700; cursor: pointer; }
         .form-thumb { position: relative; width: 54px; height: 54px; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
         .form-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .form-thumb .remove-x { position: absolute; top: 2px; left: 2px; background: rgba(43,31,34,0.65); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -183,6 +195,13 @@
         // Image viewer (supports multiple images per order)
         let viewingGallery = null; // { images: [...], index: 0 }
 
+        // Pagination: how many orders to render at once (loads more on scroll)
+        let visibleCount = 25;
+        let hasMoreOrders = false;
+
+        // Editing an existing order (null = adding a new order)
+        let editingItemFor = null; // { custId, itemId }
+
         function save() {
             persistCustomers();
             render();
@@ -203,13 +222,6 @@
                     allItems = allItems.concat(customers[i].items);
                 }
             }
-
-            const pendingCount = allItems.filter(function(i) { return i.status === "preparing"; }).length;
-            const unpaidTotal = allItems.filter(function(i) { return !i.paid && i.amount; }).reduce(function(sum, i) { 
-                const total = parseFloat(i.amount) || 0;
-                const dep = parseFloat(i.deposit) || 0;
-                return sum + Math.max(total - dep, 0); 
-            }, 0);
 
             const deliveryPointsSet = {};
             const suppliersSet = {};
@@ -244,10 +256,37 @@
                     visibleCustomers.push({
                         id: c.id,
                         name: c.name,
+                        phone: c.phone,
                         items: filteredItems
                     });
                 }
             }
+            // تجميع الطلبات المفلترة فقط لحساب الإحصائيات العلوية ديناميكياً
+            let filteredAllItems = [];
+            for (let i = 0; i < visibleCustomers.length; i++) {
+                filteredAllItems = filteredAllItems.concat(visibleCustomers[i].items);
+            }
+
+            const pendingCount = filteredAllItems.filter(function(i) { return i.status === "preparing"; }).length;
+            const unpaidTotal = filteredAllItems.filter(function(i) { return !i.paid && i.amount; }).reduce(function(sum, i) { 
+                const total = parseFloat(i.amount) || 0;
+                const dep = parseFloat(i.deposit) || 0;
+                return sum + Math.max(total - dep, 0); 
+            }, 0);
+            const unpaidLabel = deliveryFilter !== "all" ? ("المتبقي · " + deliveryFilter) : "غير مدفوع";
+            
+            const totalFilteredItems = visibleCustomers.reduce(function(sum, c) { return sum + c.items.length; }, 0);
+            let itemsShownSoFar = 0;
+            const pagedCustomers = [];
+            for (let i = 0; i < visibleCustomers.length; i++) {
+                if (itemsShownSoFar >= visibleCount) break;
+                const c = visibleCustomers[i];
+                const remaining = visibleCount - itemsShownSoFar;
+                const itemsSlice = c.items.slice(0, remaining);
+                pagedCustomers.push({ id: c.id, name: c.name, phone: c.phone, items: itemsSlice });
+                itemsShownSoFar += itemsSlice.length;
+            }
+            hasMoreOrders = itemsShownSoFar < totalFilteredItems;
 
             let html = `
                 <div class="header">
@@ -270,13 +309,13 @@
                         </div>
                         <div class="stat-tag" style="background: #FBE4E4;">
                             <span class="stat-num" style="color: #9A3B3B;">${unpaidTotal}</span>
-                            <span class="stat-label" style="color: #9A3B3B;">غير مدفوع</span>
+                            <span class="stat-label" style="color: #9A3B3B;" title="${unpaidLabel}">${unpaidLabel}</span>
                         </div>
                     </div>
                 </div>
 
                 <div style="padding: 18px 20px 0;">
-                    <input type="text" class="input" style="border-radius:14px;" placeholder="🔍 ابحثي باسم الزبونة..." value="${searchQuery}" oninput="searchQuery=this.value; render();" id="searchInput">
+                    <input type="text" class="input" style="border-radius:14px;" placeholder="🔍 ابحثي باسم الزبونة..." value="${searchQuery}" oninput="searchQuery=this.value; visibleCount=25; render();" id="searchInput">
                 </div>
 
                 <div class="filter-row">
@@ -291,21 +330,21 @@
                 <div class="more-filters ${showFilters ? 'show' : ''}">
                     <div class="filter-field">
                         <label class="filter-label">نقطة التسليم</label>
-                        <select class="filter-select" onchange="deliveryFilter=this.value; render();">
+                        <select class="filter-select" onchange="deliveryFilter=this.value; visibleCount=25; render();">
                             <option value="all">كل النقاط</option>
                             ${deliveryPoints.map(function(p) { return `<option value="${p}" ${deliveryFilter === p ? 'selected' : ''}>${p}</option>`; }).join('')}
                         </select>
                     </div>
                     <div class="filter-field">
                         <label class="filter-label">المورد</label>
-                        <select class="filter-select" onchange="supplierFilter=this.value; render();">
+                        <select class="filter-select" onchange="supplierFilter=this.value; visibleCount=25; render();">
                             <option value="all">كل الموردين</option>
                             ${suppliers.map(function(s) { return `<option value="${s}" ${supplierFilter === s ? 'selected' : ''}>${s}</option>`; }).join('')}
                         </select>
                     </div>
                     <div class="filter-field">
                         <label class="filter-label">الدفع</label>
-                        <select class="filter-select" onchange="paidFilter=this.value; render();">
+                        <select class="filter-select" onchange="paidFilter=this.value; visibleCount=25; render();">
                             <option value="all">الكل</option>
                             <option value="paid" ${paidFilter === 'paid' ? 'selected' : ''}>مدفوع</option>
                             <option value="unpaid" ${paidFilter === 'unpaid' ? 'selected' : ''}>غير مدفوع</option>
@@ -313,7 +352,7 @@
                     </div>
                     <div class="filter-field">
                         <label class="filter-label">طريقة الدفع</label>
-                        <select class="filter-select" onchange="paymentMethodFilter=this.value; render();">
+                        <select class="filter-select" onchange="paymentMethodFilter=this.value; visibleCount=25; render();">
                             <option value="all">الكل</option>
                             <option value="كريمي" ${paymentMethodFilter === 'كريمي' ? 'selected' : ''}>كريمي</option>
                             <option value="النجم" ${paymentMethodFilter === 'النجم' ? 'selected' : ''}>النجم</option>
@@ -322,11 +361,11 @@
                     </div>
                     <div class="filter-field">
                         <label class="filter-label">من تاريخ</label>
-                        <input type="date" class="filter-select" value="${dateFrom}" onchange="dateFrom=this.value; render();">
+                        <input type="date" class="filter-select" value="${dateFrom}" onchange="dateFrom=this.value; visibleCount=25; render();">
                     </div>
                     <div class="filter-field">
                         <label class="filter-label">إلى تاريخ</label>
-                        <input type="date" class="filter-select" value="${dateTo}" onchange="dateTo=this.value; render();">
+                        <input type="date" class="filter-select" value="${dateTo}" onchange="dateTo=this.value; visibleCount=25; render();">
                     </div>
                     ${(dateFrom || dateTo) ? `
                     <div class="filter-field" style="flex-basis:100%;">
@@ -340,7 +379,7 @@
                             <div style="height:1px;width:60px;margin:0 auto 14px;border-top:2px dashed #D9BEC3;"></div>
                             <div>لا يوجد طلبات مطابقة لهذا الفرز</div>
                         </div>
-                    ` : visibleCustomers.map(function(c) {
+                    ` : pagedCustomers.map(function(c) {
                         const isOpen = expanded[c.id] ?? true;
                         let custPending = 0;
                         let custUnpaid = 0;
@@ -377,7 +416,8 @@
                                                                 return `<div class="card-image-wrap" onclick="openImageViewer('${c.id}','${it.id}', ${idx})" style="cursor:pointer;"><img src="${img}" class="card-image"></div>`;
                                                             }).join('') : `<div class="card-image-wrap">📷</div>`}
                                                         </div>
-                                                        <button class="icon-btn" style="margin-right:auto;" onclick="removeItem('${c.id}', '${it.id}')">🗑️</button>
+                                                        <button class="icon-btn" style="margin-right:auto;" onclick="openEditItem('${c.id}', '${it.id}')">✏️</button>
+                                                        <button class="icon-btn" onclick="removeItem('${c.id}', '${it.id}')">🗑️</button>
                                                     </div>
                                                     <div style="flex: 1; min-width: 0; margin-top:8px;">
                                                         ${it.size ? `<div class="card-size">المقاس: ${it.size}</div>` : ''}
@@ -397,6 +437,10 @@
                                                             <span class="status-tag" style="background:#F3DEE1; color:#6B2737;">
                                                                 💰 عربون ${it.deposit}${it.amount ? ' · متبقي ' + Math.max((parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0), 0) : ''}
                                                             </span>` : ''}
+                                                            ${(!it.paid && it.amount && (parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0) > 0) ? `
+                                                            <button class="status-tag" style="background:#FDF0D8; color:#8A6A1F;" onclick="addPayment('${c.id}', '${it.id}')">
+                                                                ➕ إضافة دفعة
+                                                            </button>` : ''}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -407,6 +451,7 @@
                             </div>
                         `;
                     }).join('')}
+                    ${hasMoreOrders ? `<div style="text-align:center; padding:14px; color:#B49AA0; font-size:12.5px;">جارٍ تحميل المزيد...</div>` : ''}
                 </div>
 
                 <button class="fab" onclick="openForm('new')">+</button>
@@ -414,7 +459,7 @@
                 <div class="sheet-overlay ${showForm ? 'show' : ''}" onclick="closeForm()">
                     <div class="sheet" onclick="event.stopPropagation()">
                         <div class="sheet-header">
-                            <div class="sheet-title">${targetCustomerId === 'new' ? 'طلب جديد' : 'إضافة طلب لنفس الزبونة'}</div>
+                            <div class="sheet-title">${editingItemFor ? 'تعديل الطلب' : (targetCustomerId === 'new' ? 'طلب جديد' : 'إضافة طلب لنفس الزبونة')}</div>
                             <button class="icon-btn" onclick="closeForm()">✕</button>
                         </div>
 
@@ -454,7 +499,10 @@
                         <div class="form-row-3">
                             <div class="form-field-group">
                                 <label class="label">نقطة التسليم (اختياري)</label>
-                                <input id="inputDelivery" class="input" value="${formDeliveryPoint}" oninput="formDeliveryPoint=this.value" placeholder="مثال: الزغروري">
+                                <input id="inputDelivery" class="input" list="deliveryPointList" value="${formDeliveryPoint}" oninput="formDeliveryPoint=this.value" placeholder="مثال: الزغروري">
+                                <datalist id="deliveryPointList">
+                                    ${deliveryPoints.map(function(p) { return `<option value="${p}">`; }).join('')}
+                                </datalist>
                             </div>
                             <div class="form-field-group">
                                 <label class="label">تاريخ الطلب</label>
@@ -502,7 +550,7 @@
                             </div>
                         ` : ''}
 
-                        <button class="submit-btn" onclick="submitForm()">حفظ الطلب</button>
+                        <button class="submit-btn" onclick="submitForm()">${editingItemFor ? 'حفظ التعديل' : 'حفظ الطلب'}</button>
                     </div>
                 </div>
 
@@ -588,9 +636,20 @@
             }
         }
 
-        function setStatusFilter(val) { statusFilter = val; render(); }
+        function setStatusFilter(val) { statusFilter = val; visibleCount = 25; render(); }
         function toggleShowFilters() { showFilters = !showFilters; render(); }
         function toggleExpand(id) { expanded[id] = !(expanded[id] ?? true); render(); }
+
+        function handleScroll() {
+            if (!hasMoreOrders) return;
+            const scrollPos = window.innerHeight + window.scrollY;
+            const threshold = document.body.offsetHeight - 400;
+            if (scrollPos >= threshold) {
+                visibleCount += 25;
+                render();
+            }
+        }
+        window.addEventListener('scroll', handleScroll);
 
         function openImageViewer(custId, itemId, idx) {
             for (let i = 0; i < customers.length; i++) {
@@ -617,6 +676,7 @@
         
         function openForm(id) {
             targetCustomerId = id;
+            editingItemFor = null;
             showForm = true;
             formImages = [];
             isPaid = false;
@@ -631,20 +691,86 @@
             formOrderDate = todayStr();
             render();
         }
+
+        function openEditItem(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            const it = customers[i].items[j];
+                            targetCustomerId = custId;
+                            editingItemFor = { custId: custId, itemId: itemId };
+                            showForm = true;
+                            formImages = (it.images && it.images.length) ? it.images.slice() : (it.image ? [it.image] : []);
+                            isPaid = !!it.paid;
+                            formPaymentMethod = it.paymentMethod || "";
+                            formCustName = "";
+                            formPhone = "";
+                            formSize = it.size || "";
+                            formDeliveryPoint = it.deliveryPoint || "";
+                            formAmount = it.amount || "";
+                            formDeposit = it.deposit || "";
+                            formSupplier = it.supplier || "";
+                            formOrderDate = it.orderDate || todayStr();
+                            render();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         function closeForm() {
             showForm = false;
+            editingItemFor = null;
             render();
+        }
+
+        function compressImage(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const maxDim = 1000;
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w >= h) {
+                            h = Math.round(h * (maxDim / w));
+                            w = maxDim;
+                        } else {
+                            w = Math.round(w * (maxDim / h));
+                            h = maxDim;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    let dataUrl;
+                    try {
+                        dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+                    } catch (err) {
+                        dataUrl = e.target.result;
+                    }
+                    callback(dataUrl);
+                };
+                img.onerror = function() {
+                    callback(e.target.result);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         function handleCameraImage(input) {
             const file = input.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    formImages.push(e.target.result);
+                compressImage(file, function(dataUrl) {
+                    formImages.push(dataUrl);
                     render();
-                };
-                reader.readAsDataURL(file);
+                });
             }
             input.value = "";
         }
@@ -652,12 +778,10 @@
         function handleGalleryImages(input) {
             const files = Array.from(input.files || []);
             files.forEach(function(file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    formImages.push(e.target.result);
+                compressImage(file, function(dataUrl) {
+                    formImages.push(dataUrl);
                     render();
-                };
-                reader.readAsDataURL(file);
+                });
             });
             input.value = "";
         }
@@ -672,6 +796,33 @@
                 alert('يرجى اختيار طريقة الدفع');
                 return;
             }
+
+            if (editingItemFor) {
+                for (let i = 0; i < customers.length; i++) {
+                    if (customers[i].id === editingItemFor.custId) {
+                        for (let j = 0; j < customers[i].items.length; j++) {
+                            if (customers[i].items[j].id === editingItemFor.itemId) {
+                                const it = customers[i].items[j];
+                                it.size = formSize.trim();
+                                it.images = formImages.slice();
+                                it.deliveryPoint = formDeliveryPoint.trim();
+                                it.paid = isPaid;
+                                it.paymentMethod = isPaid ? formPaymentMethod : null;
+                                it.amount = formAmount.trim();
+                                it.deposit = formDeposit.trim();
+                                it.supplier = formSupplier.trim();
+                                it.orderDate = formOrderDate || todayStr();
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                save();
+                closeForm();
+                return;
+            }
+
             const newItem = {
                 id: uid(),
                 size: formSize.trim(),
@@ -736,6 +887,34 @@
                             customers[i].items[j].status = customers[i].items[j].status === 'preparing' ? 'delivered' : 'preparing';
                             save();
                             return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function addPayment(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            const it = customers[i].items[j];
+                            const totalAmount = parseFloat(it.amount) || 0;
+                            const currentDeposit = parseFloat(it.deposit) || 0;
+                            const remaining = Math.max(totalAmount - currentDeposit, 0);
+                                    showCustomPrompt("أدخلي المبلغ المضاف كدفعة (المتبقي: " + remaining + "):", "", function(input) {
+            if (input === null || input === "") return;
+            const addedAmount = parseFloat(input);
+            if (!addedAmount || addedAmount <= 0) return;
+            const newDeposit = currentDeposit + addedAmount;
+            it.deposit = String(Math.min(newDeposit, totalAmount));
+            if (totalAmount > 0 && newDeposit >= totalAmount) {
+                paymentMethodPickerFor = { custId: custId, itemId: itemId };
+                save();
+            } else {
+                save();
+            }
+        });
                         }
                     }
                 }
@@ -995,7 +1174,36 @@
             exportScope = null;
             render();
         }
+        function showCustomPrompt(msg, def, cb) {
+    const modal = document.getElementById('customPromptModal');
+    const textEl = document.getElementById('customPromptText');
+    const inputEl = document.getElementById('customPromptInput');
+    const okBtn = document.getElementById('customPromptOk');
+    const cancelBtn = document.getElementById('customPromptCancel');
 
+    textEl.innerText = msg;
+    inputEl.value = def || '';
+    modal.classList.add('show');
+    setTimeout(function() { inputEl.focus(); }, 50);
+
+    function close(result) {
+        modal.classList.remove('show');
+        document.removeEventListener('keydown', onKeyDown);
+        modal.onclick = null;
+        if (cb) cb(result);
+    }
+    function onKeyDown(e) {
+        if (e.key === 'Enter') close(inputEl.value);
+        if (e.key === 'Escape') close(null);
+    }
+
+    okBtn.onclick = function() { close(inputEl.value); };
+    cancelBtn.onclick = function() { close(null); };
+    modal.onclick = function(e) { if (e.target === modal) close(null); };
+    document.addEventListener('keydown', onKeyDown);
+}
+
+    
         initApp();
 
         if ("serviceWorker" in navigator) {
@@ -1004,5 +1212,17 @@
             });
         }
     </script>
+<div id="customPromptModal" class="custom-prompt-overlay">
+    <div class="custom-prompt-card">
+        <div class="custom-prompt-icon">💰</div>
+        <h3 id="customPromptTitle" class="custom-prompt-title">إضافة دفعة جديدة</h3>
+        <p id="customPromptText" class="custom-prompt-text"></p>
+        <input type="number" id="customPromptInput" placeholder="أدخل المبلغ..." class="custom-prompt-input" inputmode="decimal">
+        <div class="custom-prompt-actions">
+            <button id="customPromptCancel" class="custom-prompt-cancel">إلغاء</button>
+            <button id="customPromptOk" class="custom-prompt-ok">تأكيد</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
