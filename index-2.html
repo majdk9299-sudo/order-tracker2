@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>دفتر الطلبات</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#6B2737">
+    <link rel="icon" href="./icon-192.png">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="دفتر الطلبات">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { min-height: 100vh; background: #FAF3F0; font-family: 'Tajawal', sans-serif; color: #2B1F22; padding-bottom: 100px; }
+        .header { background: linear-gradient(135deg, #6B2737 0%, #8A3A4C 100%); padding: 28px 20px 22px; border-bottom-left-radius: 28px; border-bottom-right-radius: 28px; }
+        .header-top { display: flex; align-items: center; gap: 12px; }
+        .brand-mark { width: 42px; height: 42px; border-radius: 14px; background: rgba(250,243,240,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #FAF3F0; font-size: 20px; }
+        .header-title { font-family: 'Amiri', serif; font-size: 28px; font-weight: 700; color: #FAF3F0; line-height: 1.2; }
+        .header-sub { font-size: 13px; color: #E8CDD3; margin-top: 2px; }
+        .stats-row { display: flex; gap: 10px; margin-top: 20px; }
+        .stat-tag { flex: 1; background: rgba(250,243,240,0.9); border-radius: 14px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .stat-num { font-size: 20px; font-weight: 800; color: #6B2737; }
+        .stat-label { font-size: 11px; color: #8B7377; }
+        .filter-row { display: flex; gap: 8px; padding: 18px 20px 0; align-items: center; }
+        .filter-btn { border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-family: 'Tajawal', sans-serif; cursor: pointer; }
+        .filter-btn.active { background: #6B2737; color: #FAF3F0; border-color: #6B2737; }
+        .filter-icon-btn { margin-right: auto; position: relative; border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 999px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .filter-icon-btn.active { background: #F3DEE1; border-color: #D9A9AF; color: #6B2737; }
+        .more-filters { display: none; gap: 8px; padding: 10px 20px 0; flex-wrap: wrap; }
+        .more-filters.show { display: flex; }
+        .filter-field { flex: 1 1 100px; }
+        .filter-label { display: block; font-size: 11px; color: #8B7377; margin-bottom: 4px; }
+        .filter-select { width: 100%; border: 1px solid #E7D3D6; background: #fff; border-radius: 10px; padding: 7px 8px; font-size: 12.5px; font-family: 'Tajawal', sans-serif; color: #2B1F22; }
+        .list { padding: 16px 20px 0; display: flex; flex-direction: column; gap: 12px; }
+        .customer-card { background: #fff; border-radius: 18px; box-shadow: 0 2px 10px rgba(107,39,55,0.06); overflow: hidden; }
+        .customer-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; }
+        .customer-avatar { width: 38px; height: 38px; border-radius: 50%; background: #F3DEE1; color: #6B2737; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex-shrink: 0; }
+        .customer-name { font-size: 15.5px; font-weight: 700; color: #2B1F22; }
+        .customer-meta { font-size: 12px; color: #8B7377; margin-top: 1px; }
+        .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
+        .add-item-btn { background: #FBEDEE; border-radius: 10px; width: 30px; height: 30px; }
+        .items-wrap { border-top: 1px dashed #EFDEE0; padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+        .item-row { display: flex; align-items: flex-start; gap: 10px; }
+        .card-image-wrap { width: 54px; height: 54px; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: #FBEDEE; display: flex; align-items: center; justify-content: center; color: #C9A9AF; }
+        .card-image { width: 100%; height: 100%; object-fit: cover; }
+        .card-size { font-size: 12.5px; color: #8B7377; margin-bottom: 5px; }
+        .tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+        .meta-tag { display: inline-flex; align-items: center; gap: 4px; background: #F5EFEC; color: #7A6A5E; border-radius: 8px; padding: 3px 8px; font-size: 11px; }
+        .badge-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .status-tag { display: inline-flex; align-items: center; gap: 5px; border: none; border-radius: 999px; padding: 4px 11px; font-size: 11.5px; font-family: 'Tajawal', sans-serif; font-weight: 700; cursor: pointer; }
+        .preparing { background: #FDF0D8; color: #8A6A1F; }
+        .delivered { background: #E4F1E6; color: #2E6B3E; }
+        .paid { background: #E4F1E6; color: #2E6B3E; }
+        .unpaid { background: #FBE4E4; color: #9A3B3B; }
+        .fab { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); width: 58px; height: 58px; border-radius: 50%; background: #6B2737; border: none; box-shadow: 0 8px 20px rgba(107,39,55,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 40; color: #FAF3F0; font-size: 26px; }
+        .sheet-overlay { position: fixed; inset: 0; background: rgba(43,31,34,0.4); display: none; align-items: flex-end; z-index: 50; }
+        .sheet-overlay.show { display: flex; }
+        .sheet { background: #FAF3F0; width: 100%; border-top-left-radius: 26px; border-top-right-radius: 26px; padding: 18px 20px 26px; max-width: 480px; margin: 0 auto; max-height: 85vh; overflow-y: auto; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .sheet-title { font-family: 'Amiri', serif; font-size: 20px; font-weight: 700; color: #6B2737; }
+        .label { display: block; font-size: 12px; color: #8B7377; margin-bottom: 5px; margin-top: 10px; }
+        .input { width: 100%; border: 1px solid #E7D3D6; background: #fff; border-radius: 12px; padding: 10px 12px; font-size: 13.5px; font-family: 'Tajawal', sans-serif; color: #2B1F22; outline: none; }
+        .form-row-3 { display: flex; gap: 8px; margin-top: 2px; }
+        .form-field-group { flex: 1; min-width: 0; }
+        .paid-toggle-row { display: flex; gap: 8px; margin-top: 4px; }
+        .paid-toggle-btn { flex: 1; border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 12px; padding: 9px 10px; font-size: 13px; font-family: 'Tajawal', sans-serif; cursor: pointer; }
+        .paid-toggle-btn.active-unpaid { background: #FBE4E4; color: #9A3B3B; border-color: #F0B8B8; }
+        .paid-toggle-btn.active-paid { background: #E4F1E6; color: #2E6B3E; border-color: #B7DDBE; }
+        .upload-btn { width: 100%; border: 1.5px dashed #D9BEC3; background: #fff; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px; color: #6B2737; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+        .submit-btn { width: 100%; margin-top: 20px; background: #6B2737; color: #FAF3F0; border: none; border-radius: 14px; padding: 13px 14px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: 'Tajawal', sans-serif; }
+        .empty-state { text-align: center; padding: 50px 20px; color: #B49AA0; }
+        .image-viewer-overlay { position: fixed; inset: 0; background: rgba(20,10,12,0.88); display: none; align-items: center; justify-content: center; z-index: 60; padding: 24px; }
+        .image-viewer-overlay.show { display: flex; }
+        .image-viewer-overlay img { max-width: 100%; max-height: 85vh; border-radius: 16px; }
+        .image-viewer-close { position: absolute; top: 24px; left: 24px; background: rgba(255,255,255,0.15); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+        .images-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+        .form-images-row { display: flex; gap: 8px; overflow-x: auto; margin-top: 8px; }
+        .form-thumb { position: relative; width: 54px; height: 54px; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+        .form-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .form-thumb .remove-x { position: absolute; top: 2px; left: 2px; background: rgba(43,31,34,0.65); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .upload-row { display: flex; gap: 8px; }
+        .upload-row .upload-btn { flex: 1; padding: 10px; font-size: 12.5px; }
+        .wa-btn { background: #E4F1E6; color: #2E6B3E; }
+        .gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.15); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+        .gallery-nav.prev { right: 12px; }
+        .gallery-nav.next { left: 12px; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        const DB_NAME = "orderTrackerDB";
+        const STORE_NAME = "appdata";
+        let customers = [];
+        let db;
+
+        function openDB() {
+            return new Promise(function(resolve, reject) {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = function(e) {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains(STORE_NAME)) {
+                        d.createObjectStore(STORE_NAME);
+                    }
+                };
+                req.onsuccess = function(e) { resolve(e.target.result); };
+                req.onerror = function(e) { reject(e); };
+            });
+        }
+
+        function loadCustomers() {
+            return new Promise(function(resolve) {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const req = tx.objectStore(STORE_NAME).get("customers");
+                req.onsuccess = function() { resolve(req.result || []); };
+                req.onerror = function() { resolve([]); };
+            });
+        }
+
+        function persistCustomers() {
+            if (!db) return;
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            tx.objectStore(STORE_NAME).put(customers, "customers");
+        }
+
+        async function initApp() {
+            try {
+                db = await openDB();
+                customers = await loadCustomers();
+            } catch (e) {
+                customers = [];
+            }
+            render();
+        }
+
+        let statusFilter = "all";
+        let deliveryFilter = "all";
+        let paidFilter = "all";
+        let paymentMethodFilter = "all";
+        let supplierFilter = "all";
+        let dateFrom = "";
+        let dateTo = "";
+        let searchQuery = "";
+        let showFilters = false;
+        let showForm = false;
+        let targetCustomerId = "new";
+        let expanded = {};
+
+        function todayStr() {
+            const d = new Date();
+            const m = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            return `${d.getFullYear()}-${m}-${day}`;
+        }
+        
+        // Form Fields State
+        let formImages = [];
+        let isPaid = false;
+        let formCustName = "";
+        let formPhone = "";
+        let formSize = "";
+        let formDeliveryPoint = "";
+        let formAmount = "";
+        let formDeposit = "";
+        let formSupplier = "";
+        let formOrderDate = todayStr();
+        let formPaymentMethod = "";
+        let paymentMethodPickerFor = null;
+
+        // Customer edit (name / whatsapp)
+        let editingCustomerId = null;
+        let editName = "";
+        let editPhone = "";
+        let customerMenuFor = null;
+
+        // Export / print
+        let exportScope = null; // 'all' | 'filtered' | {id, name}
+
+        // Image viewer (supports multiple images per order)
+        let viewingGallery = null; // { images: [...], index: 0 }
+
+        // Pagination: how many orders to render at once (loads more on scroll)
+        let visibleCount = 25;
+        let hasMoreOrders = false;
+
+        // Editing an existing order (null = adding a new order)
+        let editingItemFor = null; // { custId, itemId }
+
+        function save() {
+            persistCustomers();
+            render();
+        }
+
+        function uid() {
+            return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        }
+
+        function render() {
+            const prevSearchEl = document.getElementById('searchInput');
+            const searchHadFocus = prevSearchEl && document.activeElement === prevSearchEl;
+            const searchCursor = searchHadFocus ? prevSearchEl.selectionStart : null;
+
+            let allItems = [];
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].items && Array.isArray(customers[i].items)) {
+                    allItems = allItems.concat(customers[i].items);
+                }
+            }
+
+            const pendingCount = allItems.filter(function(i) { return i.status === "preparing"; }).length;
+            const unpaidTotal = allItems.filter(function(i) { return !i.paid && i.amount; }).reduce(function(sum, i) { 
+                const total = parseFloat(i.amount) || 0;
+                const dep = parseFloat(i.deposit) || 0;
+                return sum + Math.max(total - dep, 0); 
+            }, 0);
+
+            const deliveryPointsSet = {};
+            const suppliersSet = {};
+            for (let i = 0; i < allItems.length; i++) {
+                if (allItems[i].deliveryPoint) deliveryPointsSet[allItems[i].deliveryPoint] = true;
+                if (allItems[i].supplier) suppliersSet[allItems[i].supplier] = true;
+            }
+            const deliveryPoints = Object.keys(deliveryPointsSet);
+            const suppliers = Object.keys(suppliersSet);
+
+            const activeFilterCount = (deliveryFilter !== "all" ? 1 : 0) + (paidFilter !== "all" ? 1 : 0) + (paymentMethodFilter !== "all" ? 1 : 0) + (supplierFilter !== "all" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+
+            const visibleCustomers = [];
+            const query = searchQuery.trim().toLowerCase();
+            for (let i = 0; i < customers.length; i++) {
+                const c = customers[i];
+                if (query && !(c.name || "").toLowerCase().includes(query)) continue;
+
+                const filteredItems = (c.items || []).filter(function(it) {
+                    if (statusFilter !== "all" && it.status !== statusFilter) return false;
+                    if (deliveryFilter !== "all" && it.deliveryPoint !== deliveryFilter) return false;
+                    if (paidFilter === "paid" && !it.paid) return false;
+                    if (paidFilter === "unpaid" && it.paid) return false;
+                    if (paymentMethodFilter !== "all" && it.paymentMethod !== paymentMethodFilter) return false;
+                    if (supplierFilter !== "all" && it.supplier !== supplierFilter) return false;
+                    if (dateFrom && (!it.orderDate || it.orderDate < dateFrom)) return false;
+                    if (dateTo && (!it.orderDate || it.orderDate > dateTo)) return false;
+                    return true;
+                });
+
+                if (filteredItems.length > 0) {
+                    visibleCustomers.push({
+                        id: c.id,
+                        name: c.name,
+                        phone: c.phone,
+                        items: filteredItems
+                    });
+                }
+            }
+
+            const totalFilteredItems = visibleCustomers.reduce(function(sum, c) { return sum + c.items.length; }, 0);
+            let itemsShownSoFar = 0;
+            const pagedCustomers = [];
+            for (let i = 0; i < visibleCustomers.length; i++) {
+                if (itemsShownSoFar >= visibleCount) break;
+                const c = visibleCustomers[i];
+                const remaining = visibleCount - itemsShownSoFar;
+                const itemsSlice = c.items.slice(0, remaining);
+                pagedCustomers.push({ id: c.id, name: c.name, phone: c.phone, items: itemsSlice });
+                itemsShownSoFar += itemsSlice.length;
+            }
+            hasMoreOrders = itemsShownSoFar < totalFilteredItems;
+
+            let html = `
+                <div class="header">
+                    <div class="header-top">
+                        <div class="brand-mark">🛍️</div>
+                        <div style="flex:1;">
+                            <div class="header-title">دفتر الطلبات</div>
+                            <div class="header-sub">تابعي طلبات زبوناتك بدون ما تنسي شي</div>
+                        </div>
+                        <button class="icon-btn" style="background:rgba(250,243,240,0.15); border-radius:12px; width:38px; height:38px; color:#FAF3F0; font-size:17px;" onclick="exportScope='menu'; render();">📤</button>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat-tag">
+                            <span class="stat-num">${allItems.length}</span>
+                            <span class="stat-label">كل الطلبات</span>
+                        </div>
+                        <div class="stat-tag" style="background: #FDF0D8;">
+                            <span class="stat-num" style="color: #8A6A1F;">${pendingCount}</span>
+                            <span class="stat-label" style="color: #8A6A1F;">قيد التجهيز</span>
+                        </div>
+                        <div class="stat-tag" style="background: #FBE4E4;">
+                            <span class="stat-num" style="color: #9A3B3B;">${unpaidTotal}</span>
+                            <span class="stat-label" style="color: #9A3B3B;">غير مدفوع</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="padding: 18px 20px 0;">
+                    <input type="text" class="input" style="border-radius:14px;" placeholder="🔍 ابحثي باسم الزبونة..." value="${searchQuery}" oninput="searchQuery=this.value; visibleCount=25; render();" id="searchInput">
+                </div>
+
+                <div class="filter-row">
+                    <button class="filter-btn ${statusFilter === 'all' ? 'active' : ''}" onclick="setStatusFilter('all')">الكل</button>
+                    <button class="filter-btn ${statusFilter === 'preparing' ? 'active' : ''}" onclick="setStatusFilter('preparing')">قيد التجهيز</button>
+                    <button class="filter-btn ${statusFilter === 'delivered' ? 'active' : ''}" onclick="setStatusFilter('delivered')">تم التوصيل</button>
+                    <button class="filter-icon-btn ${activeFilterCount > 0 ? 'active' : ''}" onclick="toggleShowFilters()">
+                        ⚙️ ${activeFilterCount > 0 ? `<span style="position:absolute;top:-4px;left:-4px;background:#6B2737;color:#fff;font-size:9px;width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;">${activeFilterCount}</span>` : ''}
+                    </button>
+                </div>
+
+                <div class="more-filters ${showFilters ? 'show' : ''}">
+                    <div class="filter-field">
+                        <label class="filter-label">نقطة التسليم</label>
+                        <select class="filter-select" onchange="deliveryFilter=this.value; visibleCount=25; render();">
+                            <option value="all">كل النقاط</option>
+                            ${deliveryPoints.map(function(p) { return `<option value="${p}" ${deliveryFilter === p ? 'selected' : ''}>${p}</option>`; }).join('')}
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">المورد</label>
+                        <select class="filter-select" onchange="supplierFilter=this.value; visibleCount=25; render();">
+                            <option value="all">كل الموردين</option>
+                            ${suppliers.map(function(s) { return `<option value="${s}" ${supplierFilter === s ? 'selected' : ''}>${s}</option>`; }).join('')}
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">الدفع</label>
+                        <select class="filter-select" onchange="paidFilter=this.value; visibleCount=25; render();">
+                            <option value="all">الكل</option>
+                            <option value="paid" ${paidFilter === 'paid' ? 'selected' : ''}>مدفوع</option>
+                            <option value="unpaid" ${paidFilter === 'unpaid' ? 'selected' : ''}>غير مدفوع</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">طريقة الدفع</label>
+                        <select class="filter-select" onchange="paymentMethodFilter=this.value; visibleCount=25; render();">
+                            <option value="all">الكل</option>
+                            <option value="كريمي" ${paymentMethodFilter === 'كريمي' ? 'selected' : ''}>كريمي</option>
+                            <option value="النجم" ${paymentMethodFilter === 'النجم' ? 'selected' : ''}>النجم</option>
+                            <option value="نقد" ${paymentMethodFilter === 'نقد' ? 'selected' : ''}>نقد</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">من تاريخ</label>
+                        <input type="date" class="filter-select" value="${dateFrom}" onchange="dateFrom=this.value; visibleCount=25; render();">
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label">إلى تاريخ</label>
+                        <input type="date" class="filter-select" value="${dateTo}" onchange="dateTo=this.value; visibleCount=25; render();">
+                    </div>
+                    ${(dateFrom || dateTo) ? `
+                    <div class="filter-field" style="flex-basis:100%;">
+                        <button class="filter-btn" style="width:100%;" onclick="dateFrom=''; dateTo=''; render();">مسح فلتر التاريخ</button>
+                    </div>` : ''}
+                </div>
+
+                <div class="list">
+                    ${visibleCustomers.length === 0 ? `
+                        <div class="empty-state">
+                            <div style="height:1px;width:60px;margin:0 auto 14px;border-top:2px dashed #D9BEC3;"></div>
+                            <div>لا يوجد طلبات مطابقة لهذا الفرز</div>
+                        </div>
+                    ` : pagedCustomers.map(function(c) {
+                        const isOpen = expanded[c.id] ?? true;
+                        let custPending = 0;
+                        let custUnpaid = 0;
+                        for (let j = 0; j < c.items.length; j++) {
+                            if (c.items[j].status === "preparing") custPending++;
+                            if (!c.items[j].paid && c.items[j].amount) custUnpaid += (parseFloat(c.items[j].amount) || 0);
+                        }
+                        const firstChar = c.name && c.name.trim().length > 0 ? c.name.trim().charAt(0) : "؟";
+                        return `
+                            <div class="customer-card">
+                                <div class="customer-header" onclick="toggleExpand('${c.id}')">
+                                    <div class="customer-avatar">${firstChar}</div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div class="customer-name">${c.name}</div>
+                                        <div class="customer-meta">
+                                            ${c.items.length} طلب${custPending > 0 ? ` · ${custPending} قيد التجهيز` : ""}
+                                            ${custUnpaid > 0 ? ` · متبقي ${custUnpaid}` : ""}
+                                        </div>
+                                    </div>
+                                    ${c.phone ? `<button class="icon-btn wa-btn" style="border-radius:10px; width:32px; height:32px;" onclick="event.stopPropagation(); openWhatsApp('${c.id}')">💬</button>` : ''}
+                                    <button class="icon-btn add-item-btn" onclick="event.stopPropagation(); openForm('${c.id}')">+</button>
+                                    <button class="icon-btn" onclick="event.stopPropagation(); customerMenuFor='${c.id}'; render();">⋮</button>
+                                    <span style="color:#B49AA0; font-size:14px;">${isOpen ? '▲' : '▼'}</span>
+                                </div>
+                                ${isOpen ? `
+                                    <div class="items-wrap">
+                                        ${c.items.map(function(it) {
+                                            const imgs = (it.images && it.images.length) ? it.images : (it.image ? [it.image] : []);
+                                            return `
+                                                <div class="item-row" style="flex-direction:column; align-items:stretch;">
+                                                    <div style="display:flex; align-items:flex-start; gap:10px;">
+                                                        <div class="images-strip">
+                                                            ${imgs.length ? imgs.map(function(img, idx) {
+                                                                return `<div class="card-image-wrap" onclick="openImageViewer('${c.id}','${it.id}', ${idx})" style="cursor:pointer;"><img src="${img}" class="card-image"></div>`;
+                                                            }).join('') : `<div class="card-image-wrap">📷</div>`}
+                                                        </div>
+                                                        <button class="icon-btn" style="margin-right:auto;" onclick="openEditItem('${c.id}', '${it.id}')">✏️</button>
+                                                        <button class="icon-btn" onclick="removeItem('${c.id}', '${it.id}')">🗑️</button>
+                                                    </div>
+                                                    <div style="flex: 1; min-width: 0; margin-top:8px;">
+                                                        ${it.size ? `<div class="card-size">المقاس: ${it.size}</div>` : ''}
+                                                        <div class="tags-row">
+                                                            ${it.deliveryPoint ? `<span class="meta-tag">📍 ${it.deliveryPoint}</span>` : ''}
+                                                            ${it.supplier ? `<span class="meta-tag">🏷️ ${it.supplier}</span>` : ''}
+                                                            <span class="meta-tag" style="padding:2px 6px;">📅 <input type="date" value="${it.orderDate || ''}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateOrderDate('${c.id}', '${it.id}', this.value)" style="border:none;background:transparent;font-family:'Tajawal',sans-serif;font-size:11px;color:#7A6A5E;padding:0;"></span>
+                                                        </div>
+                                                        <div class="badge-row">
+                                                            <button class="status-tag ${it.status === 'delivered' ? 'delivered' : 'preparing'}" onclick="toggleStatus('${c.id}', '${it.id}')">
+                                                                ${it.status === 'delivered' ? '✓ تم التوصيل' : '⏳ قيد التجهيز'}
+                                                            </button>
+                                                            <button class="status-tag ${it.paid ? 'paid' : 'unpaid'}" onclick="togglePaid('${c.id}', '${it.id}')">
+                                                                👛 ${it.paid ? ('مدفوع' + (it.paymentMethod ? ' - ' + it.paymentMethod : '')) : 'غير مدفوع'} ${it.amount ? '· ' + it.amount : ''}
+                                                            </button>
+                                                            ${(parseFloat(it.deposit) > 0) ? `
+                                                            <span class="status-tag" style="background:#F3DEE1; color:#6B2737;">
+                                                                💰 عربون ${it.deposit}${it.amount ? ' · متبقي ' + Math.max((parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0), 0) : ''}
+                                                            </span>` : ''}
+                                                            ${(!it.paid && it.amount && (parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0) > 0) ? `
+                                                            <button class="status-tag" style="background:#FDF0D8; color:#8A6A1F;" onclick="addPayment('${c.id}', '${it.id}')">
+                                                                ➕ إضافة دفعة
+                                                            </button>` : ''}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                    ${hasMoreOrders ? `<div style="text-align:center; padding:14px; color:#B49AA0; font-size:12.5px;">جارٍ تحميل المزيد...</div>` : ''}
+                </div>
+
+                <button class="fab" onclick="openForm('new')">+</button>
+
+                <div class="sheet-overlay ${showForm ? 'show' : ''}" onclick="closeForm()">
+                    <div class="sheet" onclick="event.stopPropagation()">
+                        <div class="sheet-header">
+                            <div class="sheet-title">${editingItemFor ? 'تعديل الطلب' : (targetCustomerId === 'new' ? 'طلب جديد' : 'إضافة طلب لنفس الزبونة')}</div>
+                            <button class="icon-btn" onclick="closeForm()">✕</button>
+                        </div>
+
+                        ${targetCustomerId === 'new' ? `
+                            <label class="label">اسم الزبونة</label>
+                            <input id="newCustName" class="input" value="${formCustName}" oninput="formCustName=this.value" placeholder="مثال: سارة أحمد">
+                            <label class="label">رقم واتساب (اختياري)</label>
+                            <input id="newCustPhone" class="input" type="tel" value="${formPhone}" oninput="formPhone=this.value" placeholder="9665xxxxxxxx">
+                            ${customers.length > 0 ? `
+                                <label class="label">أو اختاري زبونة موجودة</label>
+                                <select class="input" onchange="targetCustomerId=this.value; render();">
+                                    <option value="new" disabled selected>اختاري من القائمة</option>
+                                    ${customers.map(function(c) { return `<option value="${c.id}">${c.name}</option>`; }).join('')}
+                                </select>
+                            ` : ''}
+                        ` : `
+                            <div style="background: #F3DEE1; border-radius: 12px; padding: 10px 14px; font-size: 13.5px; color: #6B2737; margin-top: 10px;">
+                                إضافة لـ: <strong>${(customers.find(function(c) { return c.id === targetCustomerId; }) || {}).name || ''}</strong>
+                            </div>
+                        `}
+
+                        <label class="label">صور المنتج</label>
+                        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleCameraImage(this)">
+                        <input type="file" id="galleryInput" accept="image/*" multiple style="display:none" onchange="handleGalleryImages(this)">
+                        <div class="upload-row">
+                            <button class="upload-btn" onclick="document.getElementById('cameraInput').click()">📷 تصوير</button>
+                            <button class="upload-btn" onclick="document.getElementById('galleryInput').click()">🖼️ من المعرض</button>
+                        </div>
+                        ${formImages.length ? `
+                            <div class="form-images-row">
+                                ${formImages.map(function(img, idx) {
+                                    return `<div class="form-thumb"><img src="${img}"><button class="remove-x" onclick="removeFormImage(${idx})">✕</button></div>`;
+                                }).join('')}
+                            </div>
+                        ` : ''}
+
+                        <div class="form-row-3">
+                            <div class="form-field-group">
+                                <label class="label">نقطة التسليم (اختياري)</label>
+                                <input id="inputDelivery" class="input" list="deliveryPointList" value="${formDeliveryPoint}" oninput="formDeliveryPoint=this.value" placeholder="مثال: الزغروري">
+                                <datalist id="deliveryPointList">
+                                    ${deliveryPoints.map(function(p) { return `<option value="${p}">`; }).join('')}
+                                </datalist>
+                            </div>
+                            <div class="form-field-group">
+                                <label class="label">تاريخ الطلب</label>
+                                <input id="inputOrderDate" class="input" type="date" value="${formOrderDate}" onchange="formOrderDate=this.value">
+                            </div>
+                        </div>
+
+                        <div class="form-row-3">
+                            <div class="form-field-group">
+                                <label class="label">المقاس</label>
+                                <input id="inputSize" class="input" value="${formSize}" oninput="formSize=this.value" placeholder="M أو 40">
+                            </div>
+                            <div class="form-field-group">
+                                <label class="label">المورد</label>
+                                <input id="inputSupplier" class="input" list="supplierList" value="${formSupplier}" oninput="formSupplier=this.value" placeholder="اسم المورد">
+                                <datalist id="supplierList">
+                                    ${suppliers.map(function(s) { return `<option value="${s}">`; }).join('')}
+                                </datalist>
+                            </div>
+                        </div>
+
+                        <div class="form-row-3">
+                            <div class="form-field-group">
+                                <label class="label">المبلغ</label>
+                                <input id="inputAmount" class="input" type="number" value="${formAmount}" oninput="formAmount=this.value" placeholder="السعر">
+                            </div>
+                            <div class="form-field-group">
+                                <label class="label">العربون (اختياري)</label>
+                                <input id="inputDeposit" class="input" type="number" value="${formDeposit}" oninput="formDeposit=this.value" placeholder="مقدم">
+                            </div>
+                        </div>
+
+                        <label class="label">حالة الدفع</label>
+                        <div class="paid-toggle-row">
+                            <button type="button" class="paid-toggle-btn ${!isPaid ? 'active-unpaid' : ''}" onclick="isPaid=false; formPaymentMethod=''; render();">غير مدفوع</button>
+                            <button type="button" class="paid-toggle-btn ${isPaid ? 'active-paid' : ''}" onclick="isPaid=true; render();">مدفوع</button>
+                        </div>
+
+                        ${isPaid ? `
+                            <label class="label">طريقة الدفع</label>
+                            <div class="paid-toggle-row">
+                                ${["كريمي", "النجم", "نقد"].map(function(m) {
+                                    return `<button type="button" class="paid-toggle-btn ${formPaymentMethod === m ? 'active-paid' : ''}" onclick="formPaymentMethod='${m}'; render();">${m}</button>`;
+                                }).join('')}
+                            </div>
+                        ` : ''}
+
+                        <button class="submit-btn" onclick="submitForm()">${editingItemFor ? 'حفظ التعديل' : 'حفظ الطلب'}</button>
+                    </div>
+                </div>
+
+                <div class="sheet-overlay ${paymentMethodPickerFor ? 'show' : ''}" onclick="closePaymentPicker()">
+                    <div class="sheet" onclick="event.stopPropagation()">
+                        <div class="sheet-header">
+                            <div class="sheet-title">اختاري طريقة الدفع</div>
+                            <button class="icon-btn" onclick="closePaymentPicker()">✕</button>
+                        </div>
+                        <div class="paid-toggle-row" style="flex-direction: column;">
+                            ${["كريمي", "النجم", "نقد"].map(function(m) {
+                                return `<button type="button" class="paid-toggle-btn" style="margin-bottom: 8px;" onclick="selectPaymentMethod('${m}')">${m}</button>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sheet-overlay ${customerMenuFor ? 'show' : ''}" onclick="customerMenuFor=null; render();">
+                    <div class="sheet" onclick="event.stopPropagation()">
+                        <div class="sheet-header">
+                            <div class="sheet-title">إجراءات الزبونة</div>
+                            <button class="icon-btn" onclick="customerMenuFor=null; render();">✕</button>
+                        </div>
+                        <div class="paid-toggle-row" style="flex-direction: column;">
+                            <button type="button" class="paid-toggle-btn" style="margin-bottom:8px; text-align:right;" onclick="openEditCustomer(customerMenuFor)">✏️ تعديل الاسم / رقم واتساب</button>
+                            <button type="button" class="paid-toggle-btn" style="margin-bottom:8px; text-align:right;" onclick="exportScope={id:customerMenuFor, name:(customers.find(function(c){return c.id===customerMenuFor;})||{}).name||''}; customerMenuFor=null; render();">🧾 كشف حساب (تصدير)</button>
+                            <button type="button" class="paid-toggle-btn" style="text-align:right; background:#FBE4E4; color:#9A3B3B;" onclick="removeCustomer(customerMenuFor); customerMenuFor=null;">🗑️ حذف الزبونة</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sheet-overlay ${editingCustomerId ? 'show' : ''}" onclick="closeEditCustomer()">
+                    <div class="sheet" onclick="event.stopPropagation()">
+                        <div class="sheet-header">
+                            <div class="sheet-title">تعديل بيانات الزبونة</div>
+                            <button class="icon-btn" onclick="closeEditCustomer()">✕</button>
+                        </div>
+                        <label class="label">اسم الزبونة</label>
+                        <input class="input" value="${editName}" oninput="editName=this.value" placeholder="اسم الزبونة">
+                        <label class="label">رقم واتساب (مع رمز الدولة، مثال 9665xxxxxxxx)</label>
+                        <input class="input" type="tel" value="${editPhone}" oninput="editPhone=this.value" placeholder="9665xxxxxxxx">
+                        <button class="submit-btn" onclick="saveEditCustomer()">حفظ</button>
+                    </div>
+                </div>
+
+                <div class="sheet-overlay ${exportScope ? 'show' : ''}" onclick="exportScope=null; render();">
+                    <div class="sheet" onclick="event.stopPropagation()">
+                        <div class="sheet-header">
+                            <div class="sheet-title">${exportScope && exportScope.id ? 'كشف حساب: ' + exportScope.name : 'تصدير الطلبات'}</div>
+                            <button class="icon-btn" onclick="exportScope=null; render();">✕</button>
+                        </div>
+                        <div class="paid-toggle-row" style="flex-direction: column;">
+                            ${exportScope && exportScope.id ? `
+                                <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportCustomerExcel('${exportScope.id}')">📊 تصدير Excel</button>
+                                <button type="button" class="paid-toggle-btn" onclick="printCustomer('${exportScope.id}')">🖨️ طباعة / PDF</button>
+                            ` : `
+                                <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportAllExcel()">📊 تصدير كل الطلبات (Excel)</button>
+                                <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportFilteredExcel()">📊 تصدير حسب الفلتر الحالي (Excel)</button>
+                                <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="printAll()">🖨️ طباعة كل الطلبات (PDF)</button>
+                                <button type="button" class="paid-toggle-btn" onclick="printFiltered()">🖨️ طباعة حسب الفلتر الحالي (PDF)</button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="image-viewer-overlay ${viewingGallery ? 'show' : ''}" onclick="closeImageViewer()">
+                    <button class="image-viewer-close" onclick="closeImageViewer()">✕</button>
+                    ${viewingGallery ? `
+                        ${viewingGallery.images.length > 1 ? `<button class="gallery-nav prev" onclick="event.stopPropagation(); galleryNav(1)">‹</button>` : ''}
+                        <img src="${viewingGallery.images[viewingGallery.index]}">
+                        ${viewingGallery.images.length > 1 ? `<button class="gallery-nav next" onclick="event.stopPropagation(); galleryNav(-1)">›</button>` : ''}
+                    ` : ''}
+                </div>
+            `;
+            document.getElementById('app').innerHTML = html;
+
+            if (searchHadFocus) {
+                const newSearchEl = document.getElementById('searchInput');
+                if (newSearchEl) {
+                    newSearchEl.focus();
+                    if (searchCursor !== null) newSearchEl.setSelectionRange(searchCursor, searchCursor);
+                }
+            }
+        }
+
+        function setStatusFilter(val) { statusFilter = val; visibleCount = 25; render(); }
+        function toggleShowFilters() { showFilters = !showFilters; render(); }
+        function toggleExpand(id) { expanded[id] = !(expanded[id] ?? true); render(); }
+
+        function handleScroll() {
+            if (!hasMoreOrders) return;
+            const scrollPos = window.innerHeight + window.scrollY;
+            const threshold = document.body.offsetHeight - 400;
+            if (scrollPos >= threshold) {
+                visibleCount += 25;
+                render();
+            }
+        }
+        window.addEventListener('scroll', handleScroll);
+
+        function openImageViewer(custId, itemId, idx) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            const it = customers[i].items[j];
+                            const imgs = (it.images && it.images.length) ? it.images : (it.image ? [it.image] : []);
+                            viewingGallery = { images: imgs, index: idx };
+                            render();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        function closeImageViewer() { viewingGallery = null; render(); }
+        function galleryNav(delta) {
+            if (!viewingGallery) return;
+            const len = viewingGallery.images.length;
+            viewingGallery.index = (viewingGallery.index + delta + len) % len;
+            render();
+        }
+        
+        function openForm(id) {
+            targetCustomerId = id;
+            editingItemFor = null;
+            showForm = true;
+            formImages = [];
+            isPaid = false;
+            formPaymentMethod = "";
+            formCustName = "";
+            formPhone = "";
+            formSize = "";
+            formDeliveryPoint = "";
+            formAmount = "";
+            formDeposit = "";
+            formSupplier = "";
+            formOrderDate = todayStr();
+            render();
+        }
+
+        function openEditItem(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            const it = customers[i].items[j];
+                            targetCustomerId = custId;
+                            editingItemFor = { custId: custId, itemId: itemId };
+                            showForm = true;
+                            formImages = (it.images && it.images.length) ? it.images.slice() : (it.image ? [it.image] : []);
+                            isPaid = !!it.paid;
+                            formPaymentMethod = it.paymentMethod || "";
+                            formCustName = "";
+                            formPhone = "";
+                            formSize = it.size || "";
+                            formDeliveryPoint = it.deliveryPoint || "";
+                            formAmount = it.amount || "";
+                            formDeposit = it.deposit || "";
+                            formSupplier = it.supplier || "";
+                            formOrderDate = it.orderDate || todayStr();
+                            render();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function closeForm() {
+            showForm = false;
+            editingItemFor = null;
+            render();
+        }
+
+        function compressImage(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const maxDim = 1000;
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w >= h) {
+                            h = Math.round(h * (maxDim / w));
+                            w = maxDim;
+                        } else {
+                            w = Math.round(w * (maxDim / h));
+                            h = maxDim;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    let dataUrl;
+                    try {
+                        dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+                    } catch (err) {
+                        dataUrl = e.target.result;
+                    }
+                    callback(dataUrl);
+                };
+                img.onerror = function() {
+                    callback(e.target.result);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleCameraImage(input) {
+            const file = input.files[0];
+            if (file) {
+                compressImage(file, function(dataUrl) {
+                    formImages.push(dataUrl);
+                    render();
+                });
+            }
+            input.value = "";
+        }
+
+        function handleGalleryImages(input) {
+            const files = Array.from(input.files || []);
+            files.forEach(function(file) {
+                compressImage(file, function(dataUrl) {
+                    formImages.push(dataUrl);
+                    render();
+                });
+            });
+            input.value = "";
+        }
+
+        function removeFormImage(idx) {
+            formImages.splice(idx, 1);
+            render();
+        }
+
+        function submitForm() {
+            if (isPaid && !formPaymentMethod) {
+                alert('يرجى اختيار طريقة الدفع');
+                return;
+            }
+
+            if (editingItemFor) {
+                for (let i = 0; i < customers.length; i++) {
+                    if (customers[i].id === editingItemFor.custId) {
+                        for (let j = 0; j < customers[i].items.length; j++) {
+                            if (customers[i].items[j].id === editingItemFor.itemId) {
+                                const it = customers[i].items[j];
+                                it.size = formSize.trim();
+                                it.images = formImages.slice();
+                                it.deliveryPoint = formDeliveryPoint.trim();
+                                it.paid = isPaid;
+                                it.paymentMethod = isPaid ? formPaymentMethod : null;
+                                it.amount = formAmount.trim();
+                                it.deposit = formDeposit.trim();
+                                it.supplier = formSupplier.trim();
+                                it.orderDate = formOrderDate || todayStr();
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                save();
+                closeForm();
+                return;
+            }
+
+            const newItem = {
+                id: uid(),
+                size: formSize.trim(),
+                images: formImages.slice(),
+                status: "preparing",
+                deliveryPoint: formDeliveryPoint.trim(),
+                paid: isPaid,
+                paymentMethod: isPaid ? formPaymentMethod : null,
+                amount: formAmount.trim(),
+                deposit: formDeposit.trim(),
+                supplier: formSupplier.trim(),
+                orderDate: formOrderDate || todayStr(),
+                createdAt: Date.now()
+            };
+
+            if (targetCustomerId === 'new') {
+                const name = formCustName.trim();
+                if (!name) {
+                    alert('يرجى ادخال اسم الزبونة');
+                    return;
+                }
+                const newCust = { id: uid(), name: name, phone: formPhone.trim(), items: [newItem] };
+                customers.unshift(newCust);
+                expanded[newCust.id] = true;
+            } else {
+                let cust = null;
+                for (let i = 0; i < customers.length; i++) {
+                    if (customers[i].id === targetCustomerId) {
+                        cust = customers[i];
+                        break;
+                    }
+                }
+                if (cust) {
+                    if (!cust.items) cust.items = [];
+                    cust.items.unshift(newItem);
+                    expanded[cust.id] = true;
+                }
+            }
+            save();
+            closeForm();
+        }
+
+        function updateOrderDate(custId, itemId, newDate) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            customers[i].items[j].orderDate = newDate;
+                            save();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function toggleStatus(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            customers[i].items[j].status = customers[i].items[j].status === 'preparing' ? 'delivered' : 'preparing';
+                            save();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function addPayment(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            const it = customers[i].items[j];
+                            const totalAmount = parseFloat(it.amount) || 0;
+                            const currentDeposit = parseFloat(it.deposit) || 0;
+                            const remaining = Math.max(totalAmount - currentDeposit, 0);
+                            const input = prompt('أدخلي المبلغ المضاف كدفعة (المتبقي: ' + remaining + ')', '');
+                            if (input === null) return;
+                            const addedAmount = parseFloat(input);
+                            if (!addedAmount || addedAmount <= 0) return;
+                            const newDeposit = currentDeposit + addedAmount;
+                            it.deposit = String(Math.min(newDeposit, totalAmount || newDeposit));
+                            if (totalAmount > 0 && newDeposit >= totalAmount) {
+                                paymentMethodPickerFor = { custId: custId, itemId: itemId };
+                                save();
+                            } else {
+                                save();
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function togglePaid(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            const it = customers[i].items[j];
+                            if (it.paid) {
+                                it.paid = false;
+                                it.paymentMethod = null;
+                                save();
+                            } else {
+                                paymentMethodPickerFor = { custId: custId, itemId: itemId };
+                                render();
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        function selectPaymentMethod(method) {
+            if (!paymentMethodPickerFor) return;
+            const custId = paymentMethodPickerFor.custId;
+            const itemId = paymentMethodPickerFor.itemId;
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    for (let j = 0; j < customers[i].items.length; j++) {
+                        if (customers[i].items[j].id === itemId) {
+                            customers[i].items[j].paid = true;
+                            customers[i].items[j].paymentMethod = method;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            paymentMethodPickerFor = null;
+            save();
+        }
+
+        function closePaymentPicker() {
+            paymentMethodPickerFor = null;
+            render();
+        }
+
+        function removeItem(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    customers[i].items = customers[i].items.filter(function(i) { return i.id !== itemId; });
+                    if (customers[i].items.length === 0) {
+                        customers.splice(i, 1);
+                    }
+                    save();
+                    return;
+                }
+            }
+        }
+
+        function removeCustomer(custId) {
+            if (confirm('هل أنت متأكد من حذف الزبونة وكل طلباتها؟')) {
+                customers = customers.filter(function(c) { return c.id !== custId; });
+                save();
+            }
+        }
+
+        // ---- Customer edit (name / whatsapp) ----
+        function openEditCustomer(custId) {
+            const c = customers.find(function(c) { return c.id === custId; });
+            if (!c) return;
+            editingCustomerId = custId;
+            editName = c.name || "";
+            editPhone = c.phone || "";
+            customerMenuFor = null;
+            render();
+        }
+        function closeEditCustomer() {
+            editingCustomerId = null;
+            render();
+        }
+        function saveEditCustomer() {
+            const c = customers.find(function(c) { return c.id === editingCustomerId; });
+            if (!c) return;
+            const name = editName.trim();
+            if (!name) {
+                alert('يرجى ادخال اسم الزبونة');
+                return;
+            }
+            c.name = name;
+            c.phone = editPhone.trim();
+            editingCustomerId = null;
+            save();
+        }
+
+        // ---- WhatsApp ----
+        function openWhatsApp(custId) {
+            const c = customers.find(function(c) { return c.id === custId; });
+            if (!c || !c.phone) return;
+            const digits = c.phone.replace(/[^0-9]/g, '');
+            const msg = encodeURIComponent(`مرحباً ${c.name}، نود تحديثك بخصوص طلبك 🌸`);
+            window.open(`https://wa.me/${digits}?text=${msg}`, '_blank');
+        }
+
+        // ---- Export / Print ----
+        function getFilteredCustomers() {
+            const query = searchQuery.trim().toLowerCase();
+            const result = [];
+            for (let i = 0; i < customers.length; i++) {
+                const c = customers[i];
+                if (query && !(c.name || "").toLowerCase().includes(query)) continue;
+                const filteredItems = (c.items || []).filter(function(it) {
+                    if (statusFilter !== "all" && it.status !== statusFilter) return false;
+                    if (deliveryFilter !== "all" && it.deliveryPoint !== deliveryFilter) return false;
+                    if (paidFilter === "paid" && !it.paid) return false;
+                    if (paidFilter === "unpaid" && it.paid) return false;
+                    if (paymentMethodFilter !== "all" && it.paymentMethod !== paymentMethodFilter) return false;
+                    if (supplierFilter !== "all" && it.supplier !== supplierFilter) return false;
+                    if (dateFrom && (!it.orderDate || it.orderDate < dateFrom)) return false;
+                    if (dateTo && (!it.orderDate || it.orderDate > dateTo)) return false;
+                    return true;
+                });
+                if (filteredItems.length > 0) {
+                    result.push({ id: c.id, name: c.name, items: filteredItems });
+                }
+            }
+            return result;
+        }
+
+        function buildRows(customersList) {
+            const rows = [];
+            customersList.forEach(function(c) {
+                (c.items || []).forEach(function(it) {
+                    const amount = parseFloat(it.amount) || 0;
+                    const deposit = parseFloat(it.deposit) || 0;
+                    const remaining = it.paid ? 0 : Math.max(amount - deposit, 0);
+                    rows.push({
+                        customer: c.name || "",
+                        date: it.orderDate || "",
+                        size: it.size || "",
+                        delivery: it.deliveryPoint || "",
+                        supplier: it.supplier || "",
+                        amount: amount,
+                        deposit: deposit,
+                        remaining: remaining,
+                        status: it.status === 'delivered' ? 'تم التوصيل' : 'قيد التجهيز',
+                        paid: it.paid ? 'مدفوع' : 'غير مدفوع',
+                        paymentMethod: it.paymentMethod || ''
+                    });
+                });
+            });
+            return rows;
+        }
+
+        function csvEscape(val) {
+            const s = String(val === undefined || val === null ? '' : val);
+            if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+
+        function toCSV(rows) {
+            const headers = ['الزبونة', 'التاريخ', 'المقاس', 'نقطة التسليم', 'المورد', 'المبلغ', 'العربون', 'المتبقي', 'الحالة', 'الدفع', 'طريقة الدفع'];
+            const lines = [headers.map(csvEscape).join(',')];
+            rows.forEach(function(r) {
+                lines.push([r.customer, r.date, r.size, r.delivery, r.supplier, r.amount, r.deposit, r.remaining, r.status, r.paid, r.paymentMethod].map(csvEscape).join(','));
+            });
+            return '\uFEFF' + lines.join('\n');
+        }
+
+        function downloadCSV(rows, filename) {
+            const csv = toCSV(rows);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportAllExcel() {
+            downloadCSV(buildRows(customers), 'كل_الطلبات.csv');
+            exportScope = null;
+            render();
+        }
+        function exportFilteredExcel() {
+            downloadCSV(buildRows(getFilteredCustomers()), 'الطلبات_المفلترة.csv');
+            exportScope = null;
+            render();
+        }
+        function exportCustomerExcel(custId) {
+            const c = customers.find(function(c) { return c.id === custId; });
+            if (!c) return;
+            downloadCSV(buildRows([c]), `كشف_حساب_${c.name}.csv`);
+            exportScope = null;
+            render();
+        }
+
+        function printRows(rows, title) {
+            const totalAmount = rows.reduce(function(s, r) { return s + r.amount; }, 0);
+            const totalDeposit = rows.reduce(function(s, r) { return s + r.deposit; }, 0);
+            const totalRemaining = rows.reduce(function(s, r) { return s + r.remaining; }, 0);
+            const win = window.open('', '_blank');
+            if (!win) { alert('يرجى السماح بفتح النوافذ المنبثقة للطباعة'); return; }
+            const tableRows = rows.map(function(r) {
+                return `<tr>
+                    <td>${r.customer}</td><td>${r.date}</td><td>${r.size}</td><td>${r.delivery}</td><td>${r.supplier}</td>
+                    <td>${r.amount}</td><td>${r.deposit}</td><td>${r.remaining}</td>
+                    <td>${r.status}</td><td>${r.paid}${r.paymentMethod ? ' - ' + r.paymentMethod : ''}</td>
+                </tr>`;
+            }).join('');
+            win.document.write(`
+                <html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${title}</title>
+                <style>
+                    body { font-family: Tahoma, Arial, sans-serif; padding: 20px; color: #2B1F22; }
+                    h1 { font-size: 20px; color: #6B2737; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12.5px; }
+                    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+                    th { background: #F3DEE1; color: #6B2737; }
+                    tfoot td { font-weight: bold; background: #FAF3F0; }
+                </style></head><body>
+                <h1>${title}</h1>
+                <div>تاريخ التصدير: ${todayStr()}</div>
+                <table>
+                    <thead><tr><th>الزبونة</th><th>التاريخ</th><th>المقاس</th><th>نقطة التسليم</th><th>المورد</th><th>المبلغ</th><th>العربون</th><th>المتبقي</th><th>الحالة</th><th>الدفع</th></tr></thead>
+                    <tbody>${tableRows}</tbody>
+                    <tfoot><tr><td colspan="5">الإجمالي</td><td>${totalAmount}</td><td>${totalDeposit}</td><td>${totalRemaining}</td><td colspan="2"></td></tr></tfoot>
+                </table>
+                </body></html>
+            `);
+            win.document.close();
+            win.focus();
+            setTimeout(function() { win.print(); }, 300);
+        }
+
+        function printAll() {
+            printRows(buildRows(customers), 'كل الطلبات');
+            exportScope = null;
+            render();
+        }
+        function printFiltered() {
+            printRows(buildRows(getFilteredCustomers()), 'الطلبات المفلترة');
+            exportScope = null;
+            render();
+        }
+        function printCustomer(custId) {
+            const c = customers.find(function(c) { return c.id === custId; });
+            if (!c) return;
+            printRows(buildRows([c]), 'كشف حساب - ' + c.name);
+            exportScope = null;
+            render();
+        }
+
+        initApp();
+
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker.register("./sw.js").catch(function () {});
+            });
+        }
+    </script>
+</body>
+</html>
