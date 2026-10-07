@@ -1,29 +1,6 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<script>
-(function () {
-  function box() {
-    var b = document.getElementById('fatalBox');
-    if (!b) {
-      b = document.createElement('div');
-      b.id = 'fatalBox';
-      b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#FBE4E4;color:#7A1F1F;padding:14px 16px;font:13px/1.7 Tahoma,Arial,sans-serif;direction:rtl;border-bottom:2px solid #9A3B3B;max-height:60vh;overflow:auto;';
-      (document.body || document.documentElement).appendChild(b);
-    }
-    return b;
-  }
-  window.showFatal = function (msg) { box().innerHTML = '⚠️ ' + String(msg).replace(/</g, '&lt;'); };
-  window.clearFatal = function () { var b = document.getElementById('fatalBox'); if (b) b.remove(); };
-  window.addEventListener('error', function (e) {
-    window.showFatal('خطأ بالتطبيق: ' + (e.message || '') + ' (سطر ' + (e.lineno || '?') + ')');
-  });
-  window.addEventListener('unhandledrejection', function (e) {
-    var r = e.reason; window.showFatal('خطأ: ' + ((r && r.message) || r));
-  });
-})();
-</script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>دفتر الطلبات</title>
@@ -129,159 +106,47 @@
 
     <script>
         const DB_NAME = "orderTrackerDB";
-        const DB_VERSION = 2; // لازم نفس الرقم في products.html
         const STORE_NAME = "appdata";
         let customers = [];
         let db;
-        let saveErrorShown = false;
-
-        function esc(s) {
-            return String(s === undefined || s === null ? '' : s)
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        }
 
         function openDB() {
             return new Promise(function(resolve, reject) {
-                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                const req = indexedDB.open(DB_NAME, 1);
                 req.onupgradeneeded = function(e) {
                     const d = e.target.result;
                     if (!d.objectStoreNames.contains(STORE_NAME)) {
                         d.createObjectStore(STORE_NAME);
                     }
                 };
-                req.onsuccess = function(e) {
-                    const d = e.target.result;
-                    d.onversionchange = function() { d.close(); };
-                    window.clearFatal(); resolve(d);
-                };
+                req.onsuccess = function(e) { resolve(e.target.result); };
                 req.onerror = function(e) { reject(e); };
-                req.onblocked = function() { window.showFatal('التطبيق مفتوح بنافذة أو تبويب ثاني. أغلقي كل نوافذ التطبيق (من الخلفية كمان) ثم افتحيه من جديد.'); };
             });
         }
 
-        function readKey(key) {
+        function loadCustomers() {
             return new Promise(function(resolve) {
-                try {
-                    const tx = db.transaction(STORE_NAME, "readonly");
-                    const req = tx.objectStore(STORE_NAME).get(key);
-                    req.onsuccess = function() { resolve(req.result || []); };
-                    req.onerror = function() { resolve([]); };
-                } catch (e) { resolve([]); }
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const req = tx.objectStore(STORE_NAME).get("customers");
+                req.onsuccess = function() { resolve(req.result || []); };
+                req.onerror = function() { resolve([]); };
             });
-        }
-
-        function loadCustomers() { return readKey("customers"); }
-
-        // قراءة صارمة: ترجع null عند الفشل (عشان ما نكتب فوق البيانات بالغلط)
-        function readKeyStrict(key) {
-            return new Promise(function(resolve) {
-                try {
-                    const tx = db.transaction(STORE_NAME, "readonly");
-                    const req = tx.objectStore(STORE_NAME).get(key);
-                    req.onsuccess = function() { resolve(req.result || []); };
-                    req.onerror = function() { resolve(null); };
-                } catch (e) { resolve(null); }
-            });
-        }
-
-        function persistBoth() {
-            if (!db) { warnSaveError(); return; }
-            try {
-                const tx = db.transaction(STORE_NAME, "readwrite");
-                const store = tx.objectStore(STORE_NAME);
-                store.put(customers, "customers");
-                store.put(products, "products");
-                tx.onerror = tx.onabort = function() { warnSaveError(); };
-            } catch (e) { warnSaveError(); }
-        }
-
-        function warnSaveError() {
-            if (saveErrorShown) return;
-            saveErrorShown = true;
-            alert('تعذر حفظ البيانات على الجهاز! خذي نسخة احتياطية الحين (📤 ← 💾 نسخة احتياطية) وتأكدي من مساحة التخزين.');
         }
 
         function persistCustomers() {
-            if (!db) { warnSaveError(); return; }
-            try {
-                const tx = db.transaction(STORE_NAME, "readwrite");
-                tx.objectStore(STORE_NAME).put(customers, "customers");
-                tx.onerror = tx.onabort = function() { warnSaveError(); };
-            } catch (e) { warnSaveError(); }
+            if (!db) return;
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            tx.objectStore(STORE_NAME).put(customers, "customers");
         }
 
         async function initApp() {
             try {
                 db = await openDB();
                 customers = await loadCustomers();
-                products = await readKey("products");
-                if (navigator.storage && navigator.storage.persist) { navigator.storage.persist(); }
             } catch (e) {
-                db = null;
                 customers = [];
-                alert('تعذر فتح قاعدة البيانات. بياناتك غير محذوفة — حدّثي الصفحة أو أغلقي التطبيق وافتحيه من جديد.');
             }
             render();
-        }
-
-        // ---- نسخة احتياطية / استرجاع ----
-        function pad2(n) { return String(n).padStart(2, '0'); }
-        async function backupAll() {
-            const products = await readKey("products");
-            const payload = {
-                app: "daftar-talabat",
-                version: 1,
-                exportedAt: new Date().toISOString(),
-                customers: customers,
-                products: products
-            };
-            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'نسخة_احتياطية_' + todayStr() + '.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
-            try { localStorage.setItem('lastBackupAt', String(Date.now())); } catch (e) {}
-            exportScope = null;
-            render();
-        }
-
-        function restoreBackup(input) {
-            const file = input.files && input.files[0];
-            input.value = '';
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function() {
-                let data;
-                try { data = JSON.parse(reader.result); } catch (e) { alert('الملف غير صالح.'); return; }
-                if (!data || data.app !== 'daftar-talabat' || !Array.isArray(data.customers)) {
-                    alert('هذا الملف ليس نسخة احتياطية من دفتر الطلبات.');
-                    return;
-                }
-                const prods = Array.isArray(data.products) ? data.products : [];
-                const msg = 'النسخة فيها ' + data.customers.length + ' زبونة و ' + prods.length + ' منتج.\n\nسيتم استبدال كل البيانات الحالية بها. هل أنتِ متأكدة؟';
-                if (!confirm(msg)) return;
-                try {
-                    const tx = db.transaction(STORE_NAME, "readwrite");
-                    const store = tx.objectStore(STORE_NAME);
-                    store.put(data.customers, "customers");
-                    store.put(prods, "products");
-                    tx.oncomplete = function() { alert('تم الاسترجاع ✅'); location.reload(); };
-                    tx.onerror = tx.onabort = function() { alert('فشل الاسترجاع، بياناتك الحالية لم تتغير.'); };
-                } catch (e) { alert('فشل الاسترجاع.'); }
-            };
-            reader.readAsText(file);
-        }
-
-        function backupAgeDays() {
-            let t = 0;
-            try { t = parseInt(localStorage.getItem('lastBackupAt') || '0', 10) || 0; } catch (e) {}
-            if (!t) return null;
-            return Math.floor((Date.now() - t) / 86400000);
         }
 
         let statusFilter = "all";
@@ -316,10 +181,6 @@
         let formSupplier = "";
         let formOrderDate = todayStr();
         let formPaymentMethod = "";
-        let formProductId = "";
-        let formColorId = "";
-        let formQty = "1";
-        let products = []; // كتالوج المنتجات (نفس قاعدة البيانات)
         let paymentMethodPickerFor = null;
 
         // Customer edit (name / whatsapp)
@@ -455,7 +316,7 @@
                 </div>
 
                 <div style="padding: 18px 20px 0;">
-                    <input type="text" class="input" style="border-radius:14px;" placeholder="🔍 ابحثي باسم الزبونة..." value="${esc(searchQuery)}" oninput="searchQuery=this.value; visibleCount=25; render();" id="searchInput">
+                    <input type="text" class="input" style="border-radius:14px;" placeholder="🔍 ابحثي باسم الزبونة..." value="${searchQuery}" oninput="searchQuery=this.value; visibleCount=25; render();" id="searchInput">
                 </div>
 
                 <div class="filter-row">
@@ -472,14 +333,14 @@
                         <label class="filter-label">نقطة التسليم</label>
                         <select class="filter-select" onchange="deliveryFilter=this.value; visibleCount=25; render();">
                             <option value="all">كل النقاط</option>
-                            ${deliveryPoints.map(function(p) { return `<option value="${esc(p)}" ${deliveryFilter === p ? 'selected' : ''}>${esc(p)}</option>`; }).join('')}
+                            ${deliveryPoints.map(function(p) { return `<option value="${p}" ${deliveryFilter === p ? 'selected' : ''}>${p}</option>`; }).join('')}
                         </select>
                     </div>
                     <div class="filter-field">
                         <label class="filter-label">المورد</label>
                         <select class="filter-select" onchange="supplierFilter=this.value; visibleCount=25; render();">
                             <option value="all">كل الموردين</option>
-                            ${suppliers.map(function(s) { return `<option value="${esc(s)}" ${supplierFilter === s ? 'selected' : ''}>${esc(s)}</option>`; }).join('')}
+                            ${suppliers.map(function(s) { return `<option value="${s}" ${supplierFilter === s ? 'selected' : ''}>${s}</option>`; }).join('')}
                         </select>
                     </div>
                     <div class="filter-field">
@@ -513,11 +374,6 @@
                     </div>` : ''}
                 </div>
 
-                ${(backupAgeDays() === null || backupAgeDays() >= 7) && allItems.length > 0 ? `
-                <div style="margin:14px 20px 0; background:#FDF0D8; color:#8A6A1F; border-radius:12px; padding:10px 14px; font-size:12.5px; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="exportScope='menu'; render();">
-                    <span>💾</span><span style="flex:1;">${backupAgeDays() === null ? 'خذي نسخة احتياطية عشان ما تضيع طلباتك' : ('مر ' + backupAgeDays() + ' يوم على آخر نسخة احتياطية')} — اضغطي هنا</span>
-                </div>` : ''}
-
                 <div class="list">
                     ${visibleCustomers.length === 0 ? `
                         <div class="empty-state">
@@ -530,15 +386,15 @@
                         let custUnpaid = 0;
                         for (let j = 0; j < c.items.length; j++) {
                             if (c.items[j].status === "preparing") custPending++;
-                            if (!c.items[j].paid && c.items[j].amount) custUnpaid += Math.max((parseFloat(c.items[j].amount) || 0) - (parseFloat(c.items[j].deposit) || 0), 0);
+                            if (!c.items[j].paid && c.items[j].amount) custUnpaid += (parseFloat(c.items[j].amount) || 0);
                         }
                         const firstChar = c.name && c.name.trim().length > 0 ? c.name.trim().charAt(0) : "؟";
                         return `
                             <div class="customer-card">
                                 <div class="customer-header" onclick="toggleExpand('${c.id}')">
-                                    <div class="customer-avatar">${esc(firstChar)}</div>
+                                    <div class="customer-avatar">${firstChar}</div>
                                     <div style="flex: 1; min-width: 0;">
-                                        <div class="customer-name">${esc(c.name)}</div>
+                                        <div class="customer-name">${c.name}</div>
                                         <div class="customer-meta">
                                             ${c.items.length} طلب${custPending > 0 ? ` · ${custPending} قيد التجهيز` : ""}
                                             ${custUnpaid > 0 ? ` · متبقي ${custUnpaid}` : ""}
@@ -565,11 +421,10 @@
                                                         <button class="icon-btn" onclick="removeItem('${c.id}', '${it.id}')">🗑️</button>
                                                     </div>
                                                     <div style="flex: 1; min-width: 0; margin-top:8px;">
-                                                        ${it.productName ? `<div class="card-size" style="margin-bottom:2px;">🛍️ ${esc(it.productName)}${it.colorName ? ' · ' + esc(it.colorName) : ''}${(it.qty || 1) > 1 ? ' × ' + esc(it.qty) : ''}</div>` : ''}
-                                                        ${it.size ? `<div class="card-size">المقاس: ${esc(it.size)}</div>` : ''}
+                                                        ${it.size ? `<div class="card-size">المقاس: ${it.size}</div>` : ''}
                                                         <div class="tags-row">
-                                                            ${it.deliveryPoint ? `<span class="meta-tag">📍 ${esc(it.deliveryPoint)}</span>` : ''}
-                                                            ${it.supplier ? `<span class="meta-tag">🏷️ ${esc(it.supplier)}</span>` : ''}
+                                                            ${it.deliveryPoint ? `<span class="meta-tag">📍 ${it.deliveryPoint}</span>` : ''}
+                                                            ${it.supplier ? `<span class="meta-tag">🏷️ ${it.supplier}</span>` : ''}
                                                             <span class="meta-tag" style="padding:2px 6px;">📅 <input type="date" value="${it.orderDate || ''}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateOrderDate('${c.id}', '${it.id}', this.value)" style="border:none;background:transparent;font-family:'Tajawal',sans-serif;font-size:11px;color:#7A6A5E;padding:0;"></span>
                                                         </div>
                                                         <div class="badge-row">
@@ -577,11 +432,11 @@
                                                                 ${it.status === 'delivered' ? '✓ تم التوصيل' : '⏳ قيد التجهيز'}
                                                             </button>
                                                             <button class="status-tag ${it.paid ? 'paid' : 'unpaid'}" onclick="togglePaid('${c.id}', '${it.id}')">
-                                                                👛 ${it.paid ? ('مدفوع' + (it.paymentMethod ? ' - ' + esc(it.paymentMethod) : '')) : 'غير مدفوع'} ${it.amount ? '· ' + esc(it.amount) : ''}
+                                                                👛 ${it.paid ? ('مدفوع' + (it.paymentMethod ? ' - ' + it.paymentMethod : '')) : 'غير مدفوع'} ${it.amount ? '· ' + it.amount : ''}
                                                             </button>
                                                             ${(parseFloat(it.deposit) > 0) ? `
                                                             <span class="status-tag" style="background:#F3DEE1; color:#6B2737;">
-                                                                💰 عربون ${esc(it.deposit)}${it.amount ? ' · متبقي ' + Math.max((parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0), 0) : ''}
+                                                                💰 عربون ${it.deposit}${it.amount ? ' · متبقي ' + Math.max((parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0), 0) : ''}
                                                             </span>` : ''}
                                                             ${(!it.paid && it.amount && (parseFloat(it.amount)||0) - (parseFloat(it.deposit)||0) > 0) ? `
                                                             <button class="status-tag" style="background:#FDF0D8; color:#8A6A1F;" onclick="addPayment('${c.id}', '${it.id}')">
@@ -611,23 +466,21 @@
 
                         ${targetCustomerId === 'new' ? `
                             <label class="label">اسم الزبونة</label>
-                            <input id="newCustName" class="input" value="${esc(formCustName)}" oninput="formCustName=this.value" placeholder="مثال: سارة أحمد">
+                            <input id="newCustName" class="input" value="${formCustName}" oninput="formCustName=this.value" placeholder="مثال: سارة أحمد">
                             <label class="label">رقم واتساب (اختياري)</label>
-                            <input id="newCustPhone" class="input" type="tel" value="${esc(formPhone)}" oninput="formPhone=this.value" placeholder="9665xxxxxxxx">
+                            <input id="newCustPhone" class="input" type="tel" value="${formPhone}" oninput="formPhone=this.value" placeholder="9665xxxxxxxx">
                             ${customers.length > 0 ? `
                                 <label class="label">أو اختاري زبونة موجودة</label>
                                 <select class="input" onchange="targetCustomerId=this.value; render();">
                                     <option value="new" disabled selected>اختاري من القائمة</option>
-                                    ${customers.map(function(c) { return `<option value="${c.id}">${esc(c.name)}</option>`; }).join('')}
+                                    ${customers.map(function(c) { return `<option value="${c.id}">${c.name}</option>`; }).join('')}
                                 </select>
                             ` : ''}
                         ` : `
                             <div style="background: #F3DEE1; border-radius: 12px; padding: 10px 14px; font-size: 13.5px; color: #6B2737; margin-top: 10px;">
-                                إضافة لـ: <strong>${esc((customers.find(function(c) { return c.id === targetCustomerId; }) || {}).name || '')}</strong>
+                                إضافة لـ: <strong>${(customers.find(function(c) { return c.id === targetCustomerId; }) || {}).name || ''}</strong>
                             </div>
                         `}
-
-                        ${renderProductPicker()}
 
                         <label class="label">صور المنتج</label>
                         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleCameraImage(this)">
@@ -647,27 +500,27 @@
                         <div class="form-row-3">
                             <div class="form-field-group">
                                 <label class="label">نقطة التسليم (اختياري)</label>
-                                <input id="inputDelivery" class="input" list="deliveryPointList" value="${esc(formDeliveryPoint)}" oninput="formDeliveryPoint=this.value" placeholder="مثال: الزغروري">
+                                <input id="inputDelivery" class="input" list="deliveryPointList" value="${formDeliveryPoint}" oninput="formDeliveryPoint=this.value" placeholder="مثال: الزغروري">
                                 <datalist id="deliveryPointList">
-                                    ${deliveryPoints.map(function(p) { return `<option value="${esc(p)}">`; }).join('')}
+                                    ${deliveryPoints.map(function(p) { return `<option value="${p}">`; }).join('')}
                                 </datalist>
                             </div>
                             <div class="form-field-group">
                                 <label class="label">تاريخ الطلب</label>
-                                <input id="inputOrderDate" class="input" type="date" value="${esc(formOrderDate)}" onchange="formOrderDate=this.value">
+                                <input id="inputOrderDate" class="input" type="date" value="${formOrderDate}" onchange="formOrderDate=this.value">
                             </div>
                         </div>
 
                         <div class="form-row-3">
                             <div class="form-field-group">
                                 <label class="label">المقاس</label>
-                                <input id="inputSize" class="input" value="${esc(formSize)}" oninput="formSize=this.value" placeholder="M أو 40">
+                                <input id="inputSize" class="input" value="${formSize}" oninput="formSize=this.value" placeholder="M أو 40">
                             </div>
                             <div class="form-field-group">
                                 <label class="label">المورد</label>
-                                <input id="inputSupplier" class="input" list="supplierList" value="${esc(formSupplier)}" oninput="formSupplier=this.value" placeholder="اسم المورد">
+                                <input id="inputSupplier" class="input" list="supplierList" value="${formSupplier}" oninput="formSupplier=this.value" placeholder="اسم المورد">
                                 <datalist id="supplierList">
-                                    ${suppliers.map(function(s) { return `<option value="${esc(s)}">`; }).join('')}
+                                    ${suppliers.map(function(s) { return `<option value="${s}">`; }).join('')}
                                 </datalist>
                             </div>
                         </div>
@@ -675,11 +528,11 @@
                         <div class="form-row-3">
                             <div class="form-field-group">
                                 <label class="label">المبلغ</label>
-                                <input id="inputAmount" class="input" type="number" value="${esc(formAmount)}" oninput="formAmount=this.value" placeholder="السعر">
+                                <input id="inputAmount" class="input" type="number" value="${formAmount}" oninput="formAmount=this.value" placeholder="السعر">
                             </div>
                             <div class="form-field-group">
                                 <label class="label">العربون (اختياري)</label>
-                                <input id="inputDeposit" class="input" type="number" value="${esc(formDeposit)}" oninput="formDeposit=this.value" placeholder="مقدم">
+                                <input id="inputDeposit" class="input" type="number" value="${formDeposit}" oninput="formDeposit=this.value" placeholder="مقدم">
                             </div>
                         </div>
 
@@ -737,9 +590,9 @@
                             <button class="icon-btn" onclick="closeEditCustomer()">✕</button>
                         </div>
                         <label class="label">اسم الزبونة</label>
-                        <input class="input" value="${esc(editName)}" oninput="editName=this.value" placeholder="اسم الزبونة">
+                        <input class="input" value="${editName}" oninput="editName=this.value" placeholder="اسم الزبونة">
                         <label class="label">رقم واتساب (مع رمز الدولة، مثال 9665xxxxxxxx)</label>
-                        <input class="input" type="tel" value="${esc(editPhone)}" oninput="editPhone=this.value" placeholder="9665xxxxxxxx">
+                        <input class="input" type="tel" value="${editPhone}" oninput="editPhone=this.value" placeholder="9665xxxxxxxx">
                         <button class="submit-btn" onclick="saveEditCustomer()">حفظ</button>
                     </div>
                 </div>
@@ -747,7 +600,7 @@
                 <div class="sheet-overlay ${exportScope ? 'show' : ''}" onclick="exportScope=null; render();">
                     <div class="sheet" onclick="event.stopPropagation()">
                         <div class="sheet-header">
-                            <div class="sheet-title">${exportScope && exportScope.id ? 'كشف حساب: ' + esc(exportScope.name) : 'تصدير الطلبات'}</div>
+                            <div class="sheet-title">${exportScope && exportScope.id ? 'كشف حساب: ' + exportScope.name : 'تصدير الطلبات'}</div>
                             <button class="icon-btn" onclick="exportScope=null; render();">✕</button>
                         </div>
                         <div class="paid-toggle-row" style="flex-direction: column;">
@@ -758,11 +611,7 @@
                                 <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportAllExcel()">📊 تصدير كل الطلبات (Excel)</button>
                                 <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportFilteredExcel()">📊 تصدير حسب الفلتر الحالي (Excel)</button>
                                 <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="printAll()">🖨️ طباعة كل الطلبات (PDF)</button>
-                                <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="printFiltered()">🖨️ طباعة حسب الفلتر الحالي (PDF)</button>
-                                <div style="height:1px;background:#E7D3D6;margin:6px 0 12px;"></div>
-                                <button type="button" class="paid-toggle-btn active-paid" style="margin-bottom:8px;" onclick="backupAll()">💾 نسخة احتياطية (الطلبات + الكتالوج)</button>
-                                <button type="button" class="paid-toggle-btn" onclick="document.getElementById('restoreInput').click()">♻️ استرجاع من نسخة احتياطية</button>
-                                <div style="font-size:11.5px;color:#8B7377;margin-top:10px;text-align:center;">${backupAgeDays() === null ? 'ما أخذتي نسخة احتياطية من هذا الجهاز بعد' : ('آخر نسخة احتياطية: قبل ' + backupAgeDays() + ' يوم')}</div>
+                                <button type="button" class="paid-toggle-btn" onclick="printFiltered()">🖨️ طباعة حسب الفلتر الحالي (PDF)</button>
                             `}
                         </div>
                     </div>
@@ -826,67 +675,6 @@
             render();
         }
         
-        // ---- ربط الطلب بالكتالوج والمخزون ----
-        function refreshProductsForForm() {
-            if (!db) return;
-            readKeyStrict('products').then(function(p) {
-                if (p) { products = p; render(); }
-            });
-        }
-
-        function pickProduct(id) {
-            formProductId = id;
-            formColorId = '';
-            const p = products.find(function(x) { return x.id === id; });
-            if (p && p.colors && p.colors.length === 1) formColorId = p.colors[0].id;
-            if (!formQty) formQty = '1';
-            render();
-        }
-
-        function renderProductPicker() {
-            if (!products.length && !formProductId) return '';
-            const p = products.find(function(x) { return x.id === formProductId; });
-            let h = '<label class="label">المنتج من الكتالوج (اختياري — ينقص من المخزون تلقائياً)</label>' +
-                '<select class="input" onchange="pickProduct(this.value)">' +
-                '<option value="">— بدون ربط (كتابة يدوية) —</option>' +
-                products.map(function(x) {
-                    return '<option value="' + esc(x.id) + '"' + (formProductId === x.id ? ' selected' : '') + '>' + esc(x.name) + '</option>';
-                }).join('') + '</select>';
-            if (!p) {
-                if (formProductId) h += '<div style="font-size:12px;color:#9A3B3B;margin-top:6px;">⚠️ هذا المنتج محذوف من الكتالوج، لن يتغير المخزون.</div>';
-                return h;
-            }
-            h += '<label class="label">اللون</label><select class="input" onchange="formColorId=this.value; render();">' +
-                '<option value="" disabled' + (formColorId ? '' : ' selected') + '>اختاري اللون</option>' +
-                (p.colors || []).map(function(c) {
-                    const q = parseInt(c.qty) || 0;
-                    return '<option value="' + esc(c.id) + '"' + (formColorId === c.id ? ' selected' : '') + '>' + esc(c.name) + ' — ' + (q > 0 ? 'متوفر ' + q : 'نفذ') + '</option>';
-                }).join('') + '</select>';
-            if (p.sizes && p.sizes.length) {
-                h += '<label class="label">اختاري المقاس</label><select class="input" onchange="formSize=this.value; render();">' +
-                    '<option value="">—</option>' +
-                    p.sizes.map(function(s) {
-                        return '<option value="' + esc(s) + '"' + (formSize === s ? ' selected' : '') + '>' + esc(s) + '</option>';
-                    }).join('') + '</select>';
-            }
-            h += '<label class="label">الكمية</label><input class="input" type="number" min="1" inputmode="numeric" value="' + esc(formQty) + '" oninput="formQty=this.value">';
-            return h;
-        }
-
-        function stockFind(pid, cid) {
-            const p = products.find(function(x) { return x.id === pid; });
-            const c = p ? (p.colors || []).find(function(x) { return x.id === cid; }) : null;
-            return { p: p || null, c: c || null };
-        }
-
-        // يرجّع للمخزون اللي انخصم لهذا الطلب (في الذاكرة فقط، الحفظ بعدها)
-        function restoreStock(it) {
-            if (!it || !it.productId || !(it.stockDeducted > 0)) return;
-            const f = stockFind(it.productId, it.colorId);
-            if (f.c) f.c.qty = (parseInt(f.c.qty) || 0) + it.stockDeducted;
-            it.stockDeducted = 0;
-        }
-
         function openForm(id) {
             targetCustomerId = id;
             editingItemFor = null;
@@ -902,11 +690,7 @@
             formDeposit = "";
             formSupplier = "";
             formOrderDate = todayStr();
-            formProductId = "";
-            formColorId = "";
-            formQty = "1";
             render();
-            refreshProductsForForm();
         }
 
         function openEditItem(custId, itemId) {
@@ -929,11 +713,7 @@
                             formDeposit = it.deposit || "";
                             formSupplier = it.supplier || "";
                             formOrderDate = it.orderDate || todayStr();
-                            formProductId = it.productId || "";
-                            formColorId = it.colorId || "";
-                            formQty = String(it.qty || 1);
                             render();
-                            refreshProductsForForm();
                             return;
                         }
                     }
@@ -1012,114 +792,78 @@
             render();
         }
 
-        async function submitForm() {
+        function submitForm() {
             if (isPaid && !formPaymentMethod) {
                 alert('يرجى اختيار طريقة الدفع');
                 return;
             }
-            if (!editingItemFor && targetCustomerId === 'new' && !formCustName.trim()) {
-                alert('يرجى ادخال اسم الزبونة');
+
+            if (editingItemFor) {
+                for (let i = 0; i < customers.length; i++) {
+                    if (customers[i].id === editingItemFor.custId) {
+                        for (let j = 0; j < customers[i].items.length; j++) {
+                            if (customers[i].items[j].id === editingItemFor.itemId) {
+                                const it = customers[i].items[j];
+                                it.size = formSize.trim();
+                                it.images = formImages.slice();
+                                it.deliveryPoint = formDeliveryPoint.trim();
+                                it.paid = isPaid;
+                                it.paymentMethod = isPaid ? formPaymentMethod : null;
+                                it.amount = formAmount.trim();
+                                it.deposit = formDeposit.trim();
+                                it.supplier = formSupplier.trim();
+                                it.orderDate = formOrderDate || todayStr();
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                save();
+                closeForm();
                 return;
             }
 
-            // الطلب القديم (عند التعديل)
-            let oldItem = null;
-            if (editingItemFor) {
-                const oc = customers.find(function(c) { return c.id === editingItemFor.custId; });
-                if (oc) oldItem = (oc.items || []).find(function(i) { return i.id === editingItemFor.itemId; }) || null;
-            }
+            const newItem = {
+                id: uid(),
+                size: formSize.trim(),
+                images: formImages.slice(),
+                status: "preparing",
+                deliveryPoint: formDeliveryPoint.trim(),
+                paid: isPaid,
+                paymentMethod: isPaid ? formPaymentMethod : null,
+                amount: formAmount.trim(),
+                deposit: formDeposit.trim(),
+                supplier: formSupplier.trim(),
+                orderDate: formOrderDate || todayStr(),
+                createdAt: Date.now()
+            };
 
-            const touchesStock = !!(formProductId || (oldItem && oldItem.productId));
-            let prod = null, color = null;
-            if (touchesStock) {
-                const fresh = await readKeyStrict('products');
-                if (fresh === null) { alert('تعذر قراءة المخزون، حاولي مرة ثانية.'); return; }
-                products = fresh;
-                if (formProductId) {
-                    prod = products.find(function(p) { return p.id === formProductId; }) || null;
-                    color = prod ? (prod.colors || []).find(function(c) { return c.id === formColorId; }) || null : null;
-                    if (prod && !color) { alert('اختاري لون المنتج.'); return; }
+            if (targetCustomerId === 'new') {
+                const name = formCustName.trim();
+                if (!name) {
+                    alert('يرجى ادخال اسم الزبونة');
+                    return;
                 }
-            }
-            const qty = Math.max(parseInt(formQty) || 1, 1);
-            const keepOld = !!(oldItem && oldItem.productId && formProductId === oldItem.productId && !prod);
-
-            if (color) {
-                let avail = parseInt(color.qty) || 0;
-                if (oldItem && oldItem.productId === prod.id && oldItem.colorId === color.id) avail += (oldItem.stockDeducted || 0);
-                if (qty > avail) {
-                    if (!confirm('المتوفر من "' + prod.name + ' - ' + color.name + '" هو ' + avail + ' فقط والمطلوب ' + qty + '.\nسيُخصم المتوفر فقط والباقي يبقى بدون خصم. تكملين؟')) return;
-                }
-            }
-
-            function applyLink(it) {
-                if (keepOld) return;
-                restoreStock(it);
-                if (prod && color) {
-                    const have = parseInt(color.qty) || 0;
-                    const d = Math.min(qty, have);
-                    color.qty = have - d;
-                    it.productId = prod.id; it.colorId = color.id;
-                    it.productName = prod.name; it.colorName = color.name;
-                    it.qty = qty; it.stockDeducted = d;
-                } else {
-                    delete it.productId; delete it.colorId; delete it.productName;
-                    delete it.colorName; delete it.qty; delete it.stockDeducted;
-                }
-            }
-
-            if (editingItemFor && oldItem) {
-                const it = oldItem;
-                it.size = formSize.trim();
-                it.images = formImages.slice();
-                it.deliveryPoint = formDeliveryPoint.trim();
-                it.paid = isPaid;
-                it.paymentMethod = isPaid ? formPaymentMethod : null;
-                it.amount = formAmount.trim();
-                it.deposit = formDeposit.trim();
-                it.supplier = formSupplier.trim();
-                it.orderDate = formOrderDate || todayStr();
-                applyLink(it);
+                const newCust = { id: uid(), name: name, phone: formPhone.trim(), items: [newItem] };
+                customers.unshift(newCust);
+                expanded[newCust.id] = true;
             } else {
-                const newItem = {
-                    id: uid(),
-                    size: formSize.trim(),
-                    images: formImages.slice(),
-                    status: "preparing",
-                    deliveryPoint: formDeliveryPoint.trim(),
-                    paid: isPaid,
-                    paymentMethod: isPaid ? formPaymentMethod : null,
-                    amount: formAmount.trim(),
-                    deposit: formDeposit.trim(),
-                    supplier: formSupplier.trim(),
-                    orderDate: formOrderDate || todayStr(),
-                    createdAt: Date.now()
-                };
-                applyLink(newItem);
-
-                if (targetCustomerId === 'new') {
-                    const newCust = { id: uid(), name: formCustName.trim(), phone: formPhone.trim(), items: [newItem] };
-                    customers.unshift(newCust);
-                    expanded[newCust.id] = true;
-                } else {
-                    const cust = customers.find(function(c) { return c.id === targetCustomerId; });
-                    if (cust) {
-                        if (!cust.items) cust.items = [];
-                        cust.items.unshift(newItem);
-                        expanded[cust.id] = true;
+                let cust = null;
+                for (let i = 0; i < customers.length; i++) {
+                    if (customers[i].id === targetCustomerId) {
+                        cust = customers[i];
+                        break;
                     }
                 }
+                if (cust) {
+                    if (!cust.items) cust.items = [];
+                    cust.items.unshift(newItem);
+                    expanded[cust.id] = true;
+                }
             }
-
-            if (touchesStock) persistBoth(); else persistCustomers();
+            save();
             closeForm();
-
-            if (prod && color && (parseInt(color.qty) || 0) <= (parseInt(prod.threshold) || 3)) {
-                const left = parseInt(color.qty) || 0;
-                setTimeout(function() {
-                    alert('⚠️ تنبيه مخزون: "' + prod.name + ' - ' + color.name + '" ' + (left === 0 ? 'نفذ' : 'باقي ' + left + ' فقط'));
-                }, 100);
-            }
         }
 
         function updateOrderDate(custId, itemId, newDate) {
@@ -1141,7 +885,6 @@
                 if (customers[i].id === custId) {
                     for (let j = 0; j < customers[i].items.length; j++) {
                         if (customers[i].items[j].id === itemId) {
-                            if (customers[i].items[j].status === 'delivered' && !confirm('إرجاع الطلب إلى "قيد التجهيز"؟')) return;
                             customers[i].items[j].status = customers[i].items[j].status === 'preparing' ? 'delivered' : 'preparing';
                             save();
                             return;
@@ -1186,7 +929,6 @@
                         if (customers[i].items[j].id === itemId) {
                             const it = customers[i].items[j];
                             if (it.paid) {
-                                if (!confirm('إلغاء حالة "مدفوع" لهذا الطلب؟')) return;
                                 it.paid = false;
                                 it.paymentMethod = null;
                                 save();
@@ -1226,43 +968,27 @@
             render();
         }
 
-        async function removeItem(custId, itemId) {
-            const cust = customers.find(function(c) { return c.id === custId; });
-            if (!cust) return;
-            const it = (cust.items || []).find(function(i) { return i.id === itemId; });
-            if (!it) return;
-            const willRestore = !!(it.productId && it.stockDeducted > 0 && it.status !== 'delivered');
-            if (!confirm('حذف هذا الطلب نهائياً؟' + (willRestore ? '\nوسترجع ' + it.stockDeducted + ' قطعة للمخزون.' : ''))) return;
-            if (willRestore) {
-                const fresh = await readKeyStrict('products');
-                if (fresh === null) { alert('تعذر قراءة المخزون، ما تم الحذف. حاولي مرة ثانية.'); return; }
-                products = fresh;
-                restoreStock(it);
+        function removeItem(custId, itemId) {
+            for (let i = 0; i < customers.length; i++) {
+                if (customers[i].id === custId) {
+                    customers[i].items = customers[i].items.filter(function(i) { return i.id !== itemId; });
+                    if (customers[i].items.length === 0) {
+                        customers.splice(i, 1);
+                    }
+                    save();
+                    return;
+                }
             }
-            cust.items = cust.items.filter(function(i) { return i.id !== itemId; });
-            if (cust.items.length === 0) {
+        }
+
+        function removeCustomer(custId) {
+            if (confirm('هل أنت متأكد من حذف الزبونة وكل طلباتها؟')) {
                 customers = customers.filter(function(c) { return c.id !== custId; });
+                save();
             }
-            if (willRestore) persistBoth(); else persistCustomers();
-            render();
         }
 
-        async function removeCustomer(custId) {
-            const cust = customers.find(function(c) { return c.id === custId; });
-            if (!cust) return;
-            const linked = (cust.items || []).filter(function(i) { return i.productId && i.stockDeducted > 0 && i.status !== 'delivered'; });
-            if (!confirm('هل أنت متأكد من حذف الزبونة وكل طلباتها؟' + (linked.length ? '\nوسترجع الكميات المحجوزة للمخزون.' : ''))) return;
-            if (linked.length) {
-                const fresh = await readKeyStrict('products');
-                if (fresh === null) { alert('تعذر قراءة المخزون، ما تم الحذف. حاولي مرة ثانية.'); return; }
-                products = fresh;
-                linked.forEach(restoreStock);
-            }
-            customers = customers.filter(function(c) { return c.id !== custId; });
-            if (linked.length) persistBoth(); else persistCustomers();
-            render();
-        }
-
+        // ---- Customer edit (name / whatsapp) ----
         function openEditCustomer(custId) {
             const c = customers.find(function(c) { return c.id === custId; });
             if (!c) return;
@@ -1335,8 +1061,6 @@
                         customer: c.name || "",
                         date: it.orderDate || "",
                         size: it.size || "",
-                        product: it.productName ? (it.productName + (it.colorName ? ' - ' + it.colorName : '')) : "",
-                        qty: it.productName ? (it.qty || 1) : "",
                         delivery: it.deliveryPoint || "",
                         supplier: it.supplier || "",
                         amount: amount,
@@ -1358,10 +1082,10 @@
         }
 
         function toCSV(rows) {
-            const headers = ['الزبونة', 'التاريخ', 'المقاس', 'المنتج', 'الكمية', 'نقطة التسليم', 'المورد', 'المبلغ', 'العربون', 'المتبقي', 'الحالة', 'الدفع', 'طريقة الدفع'];
+            const headers = ['الزبونة', 'التاريخ', 'المقاس', 'نقطة التسليم', 'المورد', 'المبلغ', 'العربون', 'المتبقي', 'الحالة', 'الدفع', 'طريقة الدفع'];
             const lines = [headers.map(csvEscape).join(',')];
             rows.forEach(function(r) {
-                lines.push([r.customer, r.date, r.size, r.product, r.qty, r.delivery, r.supplier, r.amount, r.deposit, r.remaining, r.status, r.paid, r.paymentMethod].map(csvEscape).join(','));
+                lines.push([r.customer, r.date, r.size, r.delivery, r.supplier, r.amount, r.deposit, r.remaining, r.status, r.paid, r.paymentMethod].map(csvEscape).join(','));
             });
             return '\uFEFF' + lines.join('\n');
         }
@@ -1405,13 +1129,13 @@
             if (!win) { alert('يرجى السماح بفتح النوافذ المنبثقة للطباعة'); return; }
             const tableRows = rows.map(function(r) {
                 return `<tr>
-                    <td>${esc(r.customer)}</td><td>${esc(r.date)}</td><td>${esc(r.size)}</td><td>${esc(r.product)}</td><td>${esc(r.qty)}</td><td>${esc(r.delivery)}</td><td>${esc(r.supplier)}</td>
+                    <td>${r.customer}</td><td>${r.date}</td><td>${r.size}</td><td>${r.delivery}</td><td>${r.supplier}</td>
                     <td>${r.amount}</td><td>${r.deposit}</td><td>${r.remaining}</td>
-                    <td>${r.status}</td><td>${r.paid}${r.paymentMethod ? ' - ' + esc(r.paymentMethod) : ''}</td>
+                    <td>${r.status}</td><td>${r.paid}${r.paymentMethod ? ' - ' + r.paymentMethod : ''}</td>
                 </tr>`;
             }).join('');
             win.document.write(`
-                <html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+                <html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${title}</title>
                 <style>
                     body { font-family: Tahoma, Arial, sans-serif; padding: 20px; color: #2B1F22; }
                     h1 { font-size: 20px; color: #6B2737; }
@@ -1420,12 +1144,12 @@
                     th { background: #F3DEE1; color: #6B2737; }
                     tfoot td { font-weight: bold; background: #FAF3F0; }
                 </style></head><body>
-                <h1>${esc(title)}</h1>
+                <h1>${title}</h1>
                 <div>تاريخ التصدير: ${todayStr()}</div>
                 <table>
-                    <thead><tr><th>الزبونة</th><th>التاريخ</th><th>المقاس</th><th>المنتج</th><th>الكمية</th><th>نقطة التسليم</th><th>المورد</th><th>المبلغ</th><th>العربون</th><th>المتبقي</th><th>الحالة</th><th>الدفع</th></tr></thead>
+                    <thead><tr><th>الزبونة</th><th>التاريخ</th><th>المقاس</th><th>نقطة التسليم</th><th>المورد</th><th>المبلغ</th><th>العربون</th><th>المتبقي</th><th>الحالة</th><th>الدفع</th></tr></thead>
                     <tbody>${tableRows}</tbody>
-                    <tfoot><tr><td colspan="7">الإجمالي</td><td>${totalAmount}</td><td>${totalDeposit}</td><td>${totalRemaining}</td><td colspan="2"></td></tr></tfoot>
+                    <tfoot><tr><td colspan="5">الإجمالي</td><td>${totalAmount}</td><td>${totalDeposit}</td><td>${totalRemaining}</td><td colspan="2"></td></tr></tfoot>
                 </table>
                 </body></html>
             `);
@@ -1489,7 +1213,6 @@
             });
         }
     </script>
-<input type="file" id="restoreInput" accept=".json,application/json" style="display:none" onchange="restoreBackup(this)">
 <div id="customPromptModal" class="custom-prompt-overlay">
     <div class="custom-prompt-card">
         <div class="custom-prompt-icon">💰</div>
