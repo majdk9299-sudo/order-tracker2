@@ -105,14 +105,23 @@ let products = [];
 
 function openDB() {
   return new Promise(function(resolve, reject) {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = function(e) {
+    function createStore(e) {
       const d = e.target.result;
-      if (!d.objectStoreNames.contains(STORE_NAME)) {
-        d.createObjectStore(STORE_NAME);
-      }
+      if (!d.objectStoreNames.contains(STORE_NAME)) d.createObjectStore(STORE_NAME);
+    }
+    // بدون رقم نسخة حتى لا يتعارض مع صفحة الطلبات
+    const req = indexedDB.open(DB_NAME);
+    req.onupgradeneeded = createStore;
+    req.onsuccess = function(e) {
+      const d = e.target.result;
+      if (d.objectStoreNames.contains(STORE_NAME)) { resolve(d); return; }
+      const nextVersion = d.version + 1;
+      d.close();
+      const req2 = indexedDB.open(DB_NAME, nextVersion);
+      req2.onupgradeneeded = createStore;
+      req2.onsuccess = function(e2) { resolve(e2.target.result); };
+      req2.onerror = function(e2) { reject(e2); };
     };
-    req.onsuccess = function(e) { resolve(e.target.result); };
     req.onerror = function(e) { reject(e); };
   });
 }
