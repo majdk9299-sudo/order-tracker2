@@ -99,6 +99,18 @@
         .gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.15); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; }
         .gallery-nav.prev { right: 12px; }
         .gallery-nav.next { left: 12px; }
+        .backup-banner { margin: 14px 20px 0; padding: 10px 14px; background: #FDF0D8; color: #8A6A1F; border-radius: 14px; font-size: 12.5px; cursor: pointer; }
+        .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+        .chip-btn { border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-family: 'Tajawal', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .chip-btn.active { background: #6B2737; color: #FAF3F0; border-color: #6B2737; }
+        .chip-btn.out { background: #FBE4E4; color: #9A3B3B; border-color: #F0B8B8; }
+        .chip-btn.out.active { background: #9A3B3B; color: #fff; border-color: #9A3B3B; }
+        .chip-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
+        .deduct-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px; background: #fff; border: 1px solid #E7D3D6; border-radius: 12px; font-size: 13px; color: #2B1F22; }
+        .deduct-row input { width: 18px; height: 18px; accent-color: #6B2737; flex-shrink: 0; }
+        .link-locked { margin-top: 4px; padding: 10px 12px; background: #E4F1E6; color: #2E6B3E; border-radius: 12px; font-size: 13px; }
+        .sheet-note { font-size: 11.5px; color: #8B7377; margin: 2px 2px 10px; line-height: 1.6; }
+        .sheet-sep { height: 1px; background: #EFDEE0; margin: 8px 0 12px; }
     </style>
 </head>
 <body>
@@ -108,19 +120,51 @@
         const DB_NAME = "orderTrackerDB";
         const STORE_NAME = "appdata";
         let customers = [];
+        let products = [];
+        let lastBackupAt = 0;
         let db;
 
         function openDB() {
             return new Promise(function(resolve, reject) {
-                const req = indexedDB.open(DB_NAME, 1);
-                req.onupgradeneeded = function(e) {
+                function createStore(e) {
                     const d = e.target.result;
-                    if (!d.objectStoreNames.contains(STORE_NAME)) {
-                        d.createObjectStore(STORE_NAME);
-                    }
+                    if (!d.objectStoreNames.contains(STORE_NAME)) d.createObjectStore(STORE_NAME);
+                }
+                // نفتح بدون رقم نسخة حتى لا يحصل تعارض مع صفحة الكتالوج
+                const req = indexedDB.open(DB_NAME);
+                req.onupgradeneeded = createStore;
+                req.onsuccess = function(e) {
+                    const d = e.target.result;
+                    if (d.objectStoreNames.contains(STORE_NAME)) { resolve(d); return; }
+                    const nextVersion = d.version + 1;
+                    d.close();
+                    const req2 = indexedDB.open(DB_NAME, nextVersion);
+                    req2.onupgradeneeded = createStore;
+                    req2.onsuccess = function(e2) { resolve(e2.target.result); };
+                    req2.onerror = function(e2) { reject(e2); };
                 };
-                req.onsuccess = function(e) { resolve(e.target.result); };
                 req.onerror = function(e) { reject(e); };
+            });
+        }
+
+        function getKey(key) {
+            return new Promise(function(resolve) {
+                try {
+                    const tx = db.transaction(STORE_NAME, "readonly");
+                    const req = tx.objectStore(STORE_NAME).get(key);
+                    req.onsuccess = function() { resolve(req.result); };
+                    req.onerror = function() { resolve(undefined); };
+                } catch (e) { resolve(undefined); }
+            });
+        }
+
+        function setKey(key, val) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).put(val, key);
+                tx.oncomplete = function() { resolve(); };
+                tx.onerror = function() { reject(tx.error); };
+                tx.onabort = function() { reject(tx.error); };
             });
         }
 
@@ -143,10 +187,211 @@
             try {
                 db = await openDB();
                 customers = await loadCustomers();
+                products = (await getKey("products")) || [];
+                lastBackupAt = (await getKey("lastBackupAt")) || 0;
             } catch (e) {
                 customers = [];
             }
+            try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
             render();
+        }
+
+        function esc(v) {
+            return String(v === undefined || v === null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // ---- نسخة احتياطية كاملة ----
+        function countOrders(list) {
+            return (list || []).reduce(function(s, c) { return s + ((c.items || []).length); }, 0);
+        }
+
+        async function exportBackup() {
+            try {
+                const freshProducts = await getKey("products");
+                if (Array.isArray(freshProducts)) products = freshProducts;
+            } catch (e) {}
+            const data = {
+                app: "order-tracker",
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                customers: customers,
+                products: products
+            };
+            const json = JSON.stringify(data);
+            const fileName = 'نسخة-احتياطية-' + todayStr() + '.json';
+            let done = false;
+            try {
+                const file = new File([json], fileName, { type: 'application/json' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: 'نسخة احتياطية - دفتر الطلبات' });
+                    done = true;
+                }
+            } catch (e) {
+                if (e && e.name === 'AbortError') { return; }
+            }
+            if (!done) {
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+            }
+            lastBackupAt = Date.now();
+            try { await setKey("lastBackupAt", lastBackupAt); } catch (e) {}
+            exportScope = null;
+            render();
+        }
+
+        function triggerRestore() {
+            document.getElementById('restoreInput').click();
+        }
+
+        function handleRestoreFile(input) {
+            const file = input.files && input.files[0];
+            input.value = "";
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                let data;
+                try { data = JSON.parse(e.target.result); }
+                catch (err) { alert('الملف غير صالح، تأكدي أنه ملف نسخة احتياطية من التطبيق.'); return; }
+                if (!data || !Array.isArray(data.customers)) {
+                    alert('هذا الملف ليس نسخة احتياطية لدفتر الطلبات.');
+                    return;
+                }
+                const newProducts = Array.isArray(data.products) ? data.products : [];
+                const msg = 'سيتم استبدال بياناتك الحالية بالنسخة المختارة.\n\n' +
+                    'الحالية: ' + customers.length + ' زبونة، ' + countOrders(customers) + ' طلب، ' + products.length + ' منتج\n' +
+                    'النسخة: ' + data.customers.length + ' زبونة، ' + countOrders(data.customers) + ' طلب، ' + newProducts.length + ' منتج\n\n' +
+                    'هل تريدين المتابعة؟';
+                if (!confirm(msg)) return;
+                try {
+                    await setKey("customers",
+                                 await setKey("products", newProducts);
+                } catch (err) {
+                    alert('تعذر حفظ البيانات، لم يتغير شيء.');
+                    return;
+                }
+                customers = data.customers;
+                products = newProducts;
+                exportScope = null;
+                render();
+                alert('تمت الاستعادة بنجاح ✅');
+            };
+            reader.readAsText(file);
+        }
+
+        // ---- ربط الطلب بمنتج من الكتالوج ----
+        function linkFields() {
+            const p = products.find(function(x) { return x.id === formProductId; });
+            if (!p) return { productId: null, colorId: null, productName: null, colorName: null, colorHex: null };
+            const c = (p.colors || []).find(function(x) { return x.id === formColorId; });
+            return {
+                productId: p.id,
+                colorId: c ? c.id : null,
+                productName: p.name,
+                colorName: c ? c.name : null,
+                colorHex: c ? c.hex : null
+            };
+        }
+
+        function selectFormProduct(id) {
+            formProductId = id || "";
+            formColorId = "";
+            formDeduct = false;
+            const p = products.find(function(x) { return x.id === formProductId; });
+            if (p && p.colors && p.colors.length === 1) selectFormColor(p.colors[0].id, true);
+            else render();
+        }
+
+        function selectFormColor(cid, silent) {
+            formColorId = cid;
+            formDeduct = false;
+            const p = products.find(function(x) { return x.id === formProductId; });
+            const c = p && (p.colors || []).find(function(x) { return x.id === cid; });
+            if (c && c.images && c.images.length && formImages.length === 0) formImages.push(c.images[0]);
+            if (!silent) render(); else render();
+        }
+
+        function pickFormSize(sz) {
+            formSize = (formSize === sz) ? "" : sz;
+            render();
+        }
+
+        function buildLinkSection() {
+            if (!products.length) return '';
+            const p = products.find(function(x) { return x.id === formProductId; });
+            const c = p && (p.colors || []).find(function(x) { return x.id === formColorId; });
+            let h = '<label class="label">المنتج من الكتالوج (اختياري)</label>';
+            if (formLinkLocked) {
+                h += '<div class="link-locked">🧵 ' + esc(p ? p.name : '') + (c ? ' · ' + esc(c.name) : '') + ' — ✓ تم خصم قطعة من المخزون</div>';
+                return h;
+            }
+            h += '<select class="input" onchange="selectFormProduct(this.value)">' +
+                '<option value="">بدون ربط</option>' +
+                products.map(function(x) {
+                    return '<option value="' + esc(x.id) + '"' + (x.id === formProductId ? ' selected' : '') + '>' + esc(x.name) + '</option>';
+                }).join('') + '</select>';
+            if (p) {
+                h += '<label class="label">اللون</label><div class="chip-row">' +
+                    (p.colors || []).map(function(col) {
+                        const out = col.qty <= 0;
+                        return '<button type="button" class="chip-btn' + (out ? ' out' : '') + (col.id === formColorId ? ' active' : '') + '" onclick="selectFormColor(\'' + col.id + '\')">' +
+                            '<span class="chip-dot" style="background:' + esc(col.hex || '#7CC9A9') + '"></span>' + esc(col.name) + ' · ' + (out ? 'نفد' : col.qty) + '</button>';
+                    }).join('') + '</div>';
+                if (p.sizes && p.sizes.length) {
+                    h += '<label class="label">المقاس المتوفر</label><div class="chip-row">' +
+                        p.sizes.map(function(sz) {
+                            return '<button type="button" class="chip-btn' + (formSize === sz ? ' active' : '') + '" onclick="pickFormSize(\'' + sz + '\')">' + sz + '</button>';
+                        }).join('') + '</div>';
+                }
+                if (c) {
+                    if (c.qty > 0) {
+                        h += '<label class="deduct-row"><input type="checkbox"' + (formDeduct ? ' checked' : '') + ' onchange="formDeduct=this.checked"> خصم قطعة واحدة من مخزون هذا اللون (المتوفر: ' + c.qty + ')</label>';
+                    } else {
+                        h += '<div class="deduct-row" style="color:#9A3B3B;">⚠️ هذا اللون نفد من المخزون، لن يتم الخصم</div>';
+                    }
+                }
+            }
+            return h;
+        }
+
+        async function deductStock(item) {
+            try {
+                const fresh = await getKey("products");
+                if (Array.isArray(fresh)) products = fresh;
+                const p = products.find(function(x) { return x.id === item.productId; });
+                const c = p && (p.colors || []).find(function(x) { return x.id === item.colorId; });
+                if (!p || !c) { alert('تعذر العثور على المنتج في الكتالوج، لم يتم خصم المخزون.'); return; }
+                if (c.qty <= 0) { alert('هذا اللون نفد من المخزون، لم يتم الخصم.'); return; }
+                c.qty = c.qty - 1;
+                await setKey("products", products);
+                item.stockDeducted = true;
+                persistCustomers();
+                render();
+                const th = p.threshold || 3;
+                if (c.qty === 0) alert('⚠️ نفد من المخزون: ' + p.name + ' - ' + c.name);
+                else if (c.qty <= th) alert('⚠️ باقي ' + c.qty + ' فقط من: ' + p.name + ' - ' + c.name);
+            } catch (e) {
+                alert('تعذر تحديث المخزون.');
+            }
+        }
+
+        async function returnStock(item) {
+            try {
+                const fresh = await getKey("products");
+                if (Array.isArray(fresh)) products = fresh;
+                const p = products.find(function(x) { return x.id === item.productId; });
+                const c = p && (p.colors || []).find(function(x) { return x.id === item.colorId; });
+                if (!p || !c) return;
+                c.qty = c.qty + 1;
+                await setKey("products", products);
+            } catch (e) {}
         }
 
         let statusFilter = "all";
@@ -201,6 +446,12 @@
 
         // Editing an existing order (null = adding a new order)
         let editingItemFor = null; // { custId, itemId }
+
+        // Link order to catalog product
+        let formProductId = "";
+        let formColorId = "";
+        let formDeduct = false;
+        let formLinkLocked = false;
 
         function save() {
             persistCustomers();
@@ -283,10 +534,16 @@
                 const c = visibleCustomers[i];
                 const remaining = visibleCount - itemsShownSoFar;
                 const itemsSlice = c.items.slice(0, remaining);
-                pagedCustomers.push({ id: c.id, name: c.name, phone: c.phone, items: itemsSlice });
+                pagedCustomers.push({ id: c.id, name: c.name, phone: c.phone, items: itemsSlice, allItems: c.items });
                 itemsShownSoFar += itemsSlice.length;
             }
             hasMoreOrders = itemsShownSoFar < totalFilteredItems;
+
+            const daysSinceBackup = lastBackupAt ? Math.floor((Date.now() - lastBackupAt) / 86400000) : null;
+            const needBackup = customers.length > 0 && (daysSinceBackup === null || daysSinceBackup >= 7);
+            const backupBanner = needBackup
+                ? `<div class="backup-banner" onclick="exportScope='menu'; render();">💾 ${daysSinceBackup === null ? 'لم تحفظي نسخة احتياطية بعد' : 'آخر نسخة احتياطية قبل ' + daysSinceBackup + ' يوم'} — اضغطي للحفظ</div>`
+                : '';
 
             let html = `
                 <div class="header">
@@ -315,6 +572,7 @@
                     </div>
                 </div>
 
+                ${backupBanner}
                 <div style="padding: 18px 20px 0;">
                     <input type="text" class="input" style="border-radius:14px;" placeholder="🔍 ابحثي باسم الزبونة..." value="${searchQuery}" oninput="searchQuery=this.value; visibleCount=25; render();" id="searchInput">
                 </div>
@@ -382,11 +640,16 @@
                         </div>
                     ` : pagedCustomers.map(function(c) {
                         const isOpen = expanded[c.id] ?? true;
+      const allC = c.allItems || c.items;
                         let custPending = 0;
                         let custUnpaid = 0;
-                        for (let j = 0; j < c.items.length; j++) {
-                            if (c.items[j].status === "preparing") custPending++;
-                            if (!c.items[j].paid && c.items[j].amount) custUnpaid += (parseFloat(c.items[j].amount) || 0);
+                        for (let j = 0; j < allC.length; j++) {
+                            if (allC[j].status === "preparing") custPending++;
+                            if (!allC[j].paid && allC[j].amount) {
+                                const amt = parseFloat(allC[j].amount) || 0;
+                                const dep = parseFloat(allC[j].deposit) || 0;
+                                custUnpaid += Math.max(amt - dep, 0);
+                            }
                         }
                         const firstChar = c.name && c.name.trim().length > 0 ? c.name.trim().charAt(0) : "؟";
                         return `
@@ -396,7 +659,7 @@
                                     <div style="flex: 1; min-width: 0;">
                                         <div class="customer-name">${c.name}</div>
                                         <div class="customer-meta">
-                                            ${c.items.length} طلب${custPending > 0 ? ` · ${custPending} قيد التجهيز` : ""}
+                                            ${allC.length} طلب${custPending > 0 ? ` · ${custPending} قيد التجهيز` : ""}
                                             ${custUnpaid > 0 ? ` · متبقي ${custUnpaid}` : ""}
                                         </div>
                                     </div>
@@ -423,6 +686,7 @@
                                                     <div style="flex: 1; min-width: 0; margin-top:8px;">
                                                         ${it.size ? `<div class="card-size">المقاس: ${it.size}</div>` : ''}
                                                         <div class="tags-row">
+                                                            ${it.productName ? `<span class="meta-tag">🧵 ${esc(it.productName)}${it.colorName ? ' · ' + esc(it.colorName) : ''}${it.stockDeducted ? ' · ✓ مخصوم' : ''}</span>` : ''}
                                                             ${it.deliveryPoint ? `<span class="meta-tag">📍 ${it.deliveryPoint}</span>` : ''}
                                                             ${it.supplier ? `<span class="meta-tag">🏷️ ${it.supplier}</span>` : ''}
                                                             <span class="meta-tag" style="padding:2px 6px;">📅 <input type="date" value="${it.orderDate || ''}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateOrderDate('${c.id}', '${it.id}', this.value)" style="border:none;background:transparent;font-family:'Tajawal',sans-serif;font-size:11px;color:#7A6A5E;padding:0;"></span>
@@ -481,6 +745,8 @@
                                 إضافة لـ: <strong>${(customers.find(function(c) { return c.id === targetCustomerId; }) || {}).name || ''}</strong>
                             </div>
                         `}
+
+                        ${buildLinkSection()}
 
                         <label class="label">صور المنتج</label>
                         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleCameraImage(this)">
@@ -600,7 +866,7 @@
                 <div class="sheet-overlay ${exportScope ? 'show' : ''}" onclick="exportScope=null; render();">
                     <div class="sheet" onclick="event.stopPropagation()">
                         <div class="sheet-header">
-                            <div class="sheet-title">${exportScope && exportScope.id ? 'كشف حساب: ' + exportScope.name : 'تصدير الطلبات'}</div>
+                            <div class="sheet-title">${exportScope && exportScope.id ? 'كشف حساب: ' + exportScope.name : 'تصدير ونسخ احتياطي'}</div>
                             <button class="icon-btn" onclick="exportScope=null; render();">✕</button>
                         </div>
                         <div class="paid-toggle-row" style="flex-direction: column;">
@@ -612,6 +878,10 @@
                                 <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportFilteredExcel()">📊 تصدير حسب الفلتر الحالي (Excel)</button>
                                 <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="printAll()">🖨️ طباعة كل الطلبات (PDF)</button>
                                 <button type="button" class="paid-toggle-btn" onclick="printFiltered()">🖨️ طباعة حسب الفلتر الحالي (PDF)</button>
+                                <div class="sheet-sep"></div>
+                                <div class="sheet-note">النسخة الاحتياطية تحفظ كل الزبونات والطلبات والكتالوج والصور في ملف واحد. ${lastBackupAt ? 'آخر نسخة: ' + new Date(lastBackupAt).toLocaleDateString('ar') : 'لم تحفظي نسخة بعد.'}</div>
+                                <button type="button" class="paid-toggle-btn" style="margin-bottom:8px;" onclick="exportBackup()">💾 حفظ نسخة احتياطية كاملة</button>
+                                <button type="button" class="paid-toggle-btn" onclick="triggerRestore()">📥 استعادة من نسخة احتياطية</button>
                             `}
                         </div>
                     </div>
@@ -690,6 +960,10 @@
             formDeposit = "";
             formSupplier = "";
             formOrderDate = todayStr();
+            formProductId = "";
+            formColorId = "";
+            formDeduct = false;
+            formLinkLocked = false;
             render();
         }
 
@@ -713,6 +987,11 @@
                             formDeposit = it.deposit || "";
                             formSupplier = it.supplier || "";
                             formOrderDate = it.orderDate || todayStr();
+                            const linkedExists = it.productId && products.some(function(x) { return x.id === it.productId; });
+                            formProductId = linkedExists ? it.productId : "";
+                            formColorId = linkedExists ? (it.colorId || "") : "";
+                            formDeduct = false;
+                            formLinkLocked = !!(it.stockDeducted && linkedExists);
                             render();
                             return;
                         }
@@ -799,6 +1078,7 @@
             }
 
             if (editingItemFor) {
+                let editedItem = null;
                 for (let i = 0; i < customers.length; i++) {
                     if (customers[i].id === editingItemFor.custId) {
                         for (let j = 0; j < customers[i].items.length; j++) {
@@ -813,14 +1093,21 @@
                                 it.deposit = formDeposit.trim();
                                 it.supplier = formSupplier.trim();
                                 it.orderDate = formOrderDate || todayStr();
+                                if (!formLinkLocked) {
+                                    const stillLinked = it.productId && products.some(function(x) { return x.id === it.productId; });
+                                    if (formProductId || stillLinked) Object.assign(it, linkFields());
+                                }
+                                editedItem = it;
                                 break;
                             }
                         }
                         break;
                     }
                 }
+                const wantDeductEdit = !!(editedItem && formDeduct && !formLinkLocked && formProductId && formColorId && !editedItem.stockDeducted);
                 save();
                 closeForm();
+                if (wantDeductEdit) deductStock(editedItem);
                 return;
             }
 
@@ -838,6 +1125,9 @@
                 orderDate: formOrderDate || todayStr(),
                 createdAt: Date.now()
             };
+            Object.assign(newItem, linkFields());
+            newItem.stockDeducted = false;
+            const wantDeductNew = !!(formDeduct && formProductId && formColorId);
 
             if (targetCustomerId === 'new') {
                 const name = formCustName.trim();
@@ -864,6 +1154,7 @@
             }
             save();
             closeForm();
+            if (wantDeductNew) deductStock(newItem);
         }
 
         function updateOrderDate(custId, itemId, newDate) {
@@ -969,16 +1260,20 @@
         }
 
         function removeItem(custId, itemId) {
-            for (let i = 0; i < customers.length; i++) {
-                if (customers[i].id === custId) {
-                    customers[i].items = customers[i].items.filter(function(i) { return i.id !== itemId; });
-                    if (customers[i].items.length === 0) {
-                        customers.splice(i, 1);
-                    }
-                    save();
-                    return;
-                }
+            const cust = customers.find(function(c) { return c.id === custId; });
+            if (!cust) return;
+            const item = (cust.items || []).find(function(x) { return x.id === itemId; });
+            if (!confirm('حذف هذا الطلب؟')) return;
+            let restore = false;
+            if (item && item.stockDeducted && item.productId) {
+                restore = confirm('هذا الطلب خصم قطعة من المخزون. هل ترجعينها للكتالوج؟');
             }
+            cust.items = cust.items.filter(function(x) { return x.id !== itemId; });
+            if (cust.items.length === 0) {
+                customers = customers.filter(function(c) { return c.id !== custId; });
+            }
+            save();
+            if (restore) returnStock(item);
         }
 
         function removeCustomer(custId) {
@@ -1053,7 +1348,7 @@
         function buildRows(customersList) {
             const rows = [];
             customersList.forEach(function(c) {
-                (c.items || []).forEach(function(it) {
+   (c.items || []).forEach(function(it) {
                     const amount = parseFloat(it.amount) || 0;
                     const deposit = parseFloat(it.deposit) || 0;
                     const remaining = it.paid ? 0 : Math.max(amount - deposit, 0);
@@ -1207,12 +1502,24 @@
     
         initApp();
 
+        // عند الرجوع من صفحة الكتالوج نحدّث البيانات حتى لا تبقى نسخة قديمة
+        window.addEventListener("pageshow", function(e) {
+            if (e.persisted && db) {
+                Promise.all([loadCustomers(), getKey("products")]).then(function(r) {
+                    customers = r[0] || [];
+                    products = r[1] || [];
+                    render();
+                });
+            }
+        });
+
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", function () {
                 navigator.serviceWorker.register("./sw.js").catch(function () {});
             });
         }
     </script>
+<input type="file" id="restoreInput" accept=".json,application/json" style="display:none" onchange="handleRestoreFile(this)">
 <div id="customPromptModal" class="custom-prompt-overlay">
     <div class="custom-prompt-card">
         <div class="custom-prompt-icon">💰</div>
