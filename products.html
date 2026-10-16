@@ -34,7 +34,7 @@
         .chip { border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 16px; padding: 4px 10px; font-size: 11px; font-family: 'Tajawal', sans-serif; cursor: pointer; }
         .chip.active { background: #6B2737; color: #fff; border-color: #6B2737; }
         
-        .saved-colors-box { background: #F3DEE1; border-radius: 10px; padding: 8px; margin-top: 8px; }
+        .saved-colors-box { background: #F3DEE1; border-radius: 10px; padding: 8px; margin-top: 8px; max-height: 120px; overflow-y: auto; }
         .saved-color-pill { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #D9A9AF; border-radius: 16px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #6B2737; cursor: pointer; margin: 2px; }
 
         .color-box { background: #FAF3F0; border: 1px solid #E7D3D6; border-radius: 10px; padding: 10px; margin-top: 8px; }
@@ -181,9 +181,12 @@
         <input type="file" id="bulkImagesInput" accept="image/*" multiple style="display:none" onchange="handleBulkImages(this.files)">
         <button type="button" class="btn" style="background:#8A3A4C; margin-top:4px;" onclick="document.getElementById('bulkImagesInput').click()">📸 رفع صور الألوان دفعة واحدة</button>
 
-        <!-- الألوان المحفوظة مسبقاً -->
+        <!-- الألوان المحفوظة مسبقاً مع زر مسح -->
         <div id="savedColorsSection" style="margin-top: 10px; display:none;">
-            <label class="label">ألوانك المحفوظة السابقة (انقر لإضافة اللون سريعاً):</label>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label class="label" style="margin:0;">ألوانك المحفوظة السريعة:</label>
+                <button type="button" onclick="clearSavedColorsLibrary()" style="background:none; border:none; color:#C53030; font-size:10px; font-weight:700; cursor:pointer;">🗑️ مسح الكل</button>
+            </div>
             <div class="saved-colors-box" id="savedColorsContainer"></div>
         </div>
 
@@ -206,7 +209,7 @@
         let ALL_SIZES = ["FREE", "S", "M", "L", "XL", "XXL", "36", "38", "40", "42"];
         let selectedSizes = ["S", "M", "L", "XL"];
         let formColors = [];
-        let savedColorsLibrary = []; // قائمة الألوان المحفوظة
+        let savedColorsLibrary = [];
         let db;
         let products = [];
         let currentDetailId = null;
@@ -279,8 +282,19 @@
         function addColorToLibrary(name, hex) {
             if(!name || !name.trim()) return;
             const cleanName = name.trim();
+            // تجاهل الكلمات القصيرة جداً لمنع حفظ الحروف المقطعة
+            if(cleanName.length < 2) return;
+            
             if(!savedColorsLibrary.some(c => c.name.toLowerCase() === cleanName.toLowerCase())) {
                 savedColorsLibrary.push({ name: cleanName, hex: hex || "#6B2737" });
+                persistSavedColors();
+                renderSavedColors();
+            }
+        }
+
+        function clearSavedColorsLibrary() {
+            if(confirm('هل تريد مسح قائمة الألوان المحفوظة السريعة؟')) {
+                savedColorsLibrary = [];
                 persistSavedColors();
                 renderSavedColors();
             }
@@ -303,7 +317,6 @@
         }
 
         function applySavedColor(name, hex) {
-            // أضف اللون لأول لون فارغ أو أنشئ صفاً جديداً
             let emptyColor = formColors.find(c => !c.name || c.name.trim() === "");
             if(emptyColor) {
                 emptyColor.name = name;
@@ -398,7 +411,6 @@
                 compressImage(file, function(dataUrl) {
                     const sizesObj = {};
                     selectedSizes.forEach(s => sizesObj[s] = 0);
-                    // اسم افتراضي مؤقت للون بناءً على رقم الصورة
                     const colorName = `لون ${formColors.length + 1}`;
                     formColors.push({
                         id: uid(),
@@ -417,7 +429,8 @@
             container.innerHTML = formColors.map((c, i) => `
                 <div class="color-box">
                     <div class="color-header">
-                        <input type="text" class="input" placeholder="اسم اللون (مثل: أحمر)" value="${c.name}" oninput="formColors[${i}].name=this.value; addColorToLibrary(this.value, formColors[${i}].hex);">
+                        <!-- تم تغيير oninput إلى onchange لكي لا يحفظ الحروف أثناء الكتابة الفردية -->
+                        <input type="text" class="input" placeholder="اسم اللون (مثل: أحمر)" value="${c.name}" onchange="formColors[${i}].name=this.value; addColorToLibrary(this.value, formColors[${i}].hex);">
                         <input type="color" class="color-picker" value="${c.hex}" onchange="formColors[${i}].hex=this.value; addColorToLibrary(formColors[${i}].name, this.value);">
                         ${formColors.length > 1 ? `<button type="button" onclick="removeColorRow('${c.id}')" style="border:none;background:none;color:#B49AA0;font-size:16px;">✕</button>` : ''}
                     </div>
@@ -502,7 +515,6 @@
             const validColors = formColors.filter(c => c.name.trim() !== "");
             if(validColors.length === 0) { alert('يرجى إضافة لون واحد على الأقل مع اسمه'); return; }
 
-            // حفظ الألوان في المكتبة تلقائياً للاستخدام المستقبلي
             validColors.forEach(c => addColorToLibrary(c.name, c.hex));
 
             const productData = {
