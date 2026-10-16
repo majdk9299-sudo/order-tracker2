@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>كتالوج المنتجات</title>
+    <title>كتالوج المنتجات والمخزون</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,15 +37,37 @@
         
         .btn { background: #6B2737; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 12px; font-weight: 700; font-family: 'Tajawal', sans-serif; font-size: 14px; cursor: pointer; margin-top: 14px; }
         .btn-outline { background: #fff; color: #6B2737; border: 1px dashed #D9BEC3; }
+
+        /* شريط البحث والفلترة */
+        .filter-section { background: #fff; border-radius: 16px; padding: 14px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(107,39,55,0.04); }
+        .filter-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .filter-select { flex: 1 1 120px; padding: 8px; border: 1px solid #E7D3D6; border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 12px; background: #fff; color: #2B1F22; outline: none; }
         
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .p-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .p-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; position: relative; }
         .p-img { width: 100%; aspect-ratio: 3/4; background: #FBEDEE; object-fit: cover; display: flex; align-items: center; justify-content: center; color: #C9A9AF; font-size: 24px; }
         .p-info { padding: 10px; }
         .p-name { font-size: 13px; font-weight: 700; color: #2B1F22; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .p-meta { font-size: 11px; color: #8B7377; margin-top: 2px; }
-        
+        .p-category { display: inline-block; background: #F3DEE1; color: #6B2737; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; margin-top: 3px; }
+        .p-meta { font-size: 11px; color: #8B7377; margin-top: 4px; }
         .swatch-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #fff; display: inline-block; }
+        
+        .badge { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+        .badge-out { background: #FDE8E8; color: #C53030; }
+        .badge-low { background: #FEFCBF; color: #975A16; }
+
+        /* نافذة التفاصيل */
+        .overlay { position: fixed; inset: 0; background: rgba(43,31,34,0.5); display: none; align-items: flex-end; z-index: 50; }
+        .overlay.show { display: flex; }
+        .sheet { background: #FAF3F0; width: 100%; border-top-left-radius: 24px; border-top-right-radius: 24px; padding: 20px; max-height: 85vh; overflow-y: auto; max-width: 480px; margin: 0 auto; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .sheet-title { font-size: 18px; font-weight: 800; color: #6B2737; }
+        .detail-img { width: 100%; aspect-ratio: 4/5; border-radius: 14px; object-fit: cover; background: #FBEDEE; margin-bottom: 12px; }
+        .color-picker-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 12px; }
+        .color-pill { border: 2px solid transparent; border-radius: 12px; padding: 6px 10px; background: #fff; display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+        .color-pill.active { border-color: #6B2737; background: #FBEDEE; font-weight: 700; }
+        .qty-control { display: flex; align-items: center; gap: 10px; }
+        .qty-btn { width: 28px; height: 28px; border-radius: 8px; background: #6B2737; color: #fff; border: none; font-weight: 700; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
@@ -54,14 +76,53 @@
 
     <div class="header">
         <h1>كتالوج المنتجات والمخزون</h1>
-        <p>عرض المنتجات بنمط ألوان ومقاسات شي إن</p>
+        <p>إدارة الألوان والمقاسات والأنواع</p>
+    </div>
+
+    <!-- قسم البحث والفلترة حسب النوع والمصدر -->
+    <div class="filter-section">
+        <input type="text" id="searchInput" class="input" placeholder="🔍 ابحث بالاسم أو النوع (فستان، بجائم...)" oninput="renderList()">
+        <div class="filter-row">
+            <select id="categoryFilter" class="filter-select" onchange="renderList()">
+                <option value="all">كل الأنواع (بجائم، فساتين...)</option>
+                <option value="بجائم">بجائم</option>
+                <option value="فساتين">فساتين</option>
+                <option value="طقومات">طقومات</option>
+                <option value="لانجري">لانجري</option>
+                <option value="بنطال/بلوزة">بنطال / بلوزة</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+
+            <select id="sourceFilter" class="filter-select" onchange="renderList()">
+                <option value="all">كل المصادر</option>
+                <option value="محلي">محلي</option>
+                <option value="خارجي">خارجي</option>
+            </select>
+
+            <select id="stockFilter" class="filter-select" onchange="renderList()">
+                <option value="all">المخزون: الكل</option>
+                <option value="available">متوفر</option>
+                <option value="low">شارف على النفاد</option>
+                <option value="out">نفد</option>
+            </select>
+        </div>
     </div>
 
     <div class="card">
         <div class="card-title">إضافة منتج جديد</div>
         
-        <label class="label">اسم المنتج</label>
-        <input type="text" id="pName" class="input" placeholder="مثال: فستان بليسيه مشجر">
+        <label class="label">نوع المنتج الأساسي</label>
+        <select id="pCategory" class="input">
+            <option value="بجائم">بجائم</option>
+            <option value="فساتين">فساتين</option>
+            <option value="طقومات">طقومات</option>
+            <option value="لانجري">لانجري</option>
+            <option value="بنطال/بلوزة">بنطال / بلوزة</option>
+            <option value="أخرى">أخرى</option>
+        </select>
+
+        <label class="label">اسم وتفاصيل المنتج</label>
+        <input type="text" id="pName" class="input" placeholder="مثال: بجائم نسائي كت / فستان سهرة">
         
         <label class="label">المصدر</label>
         <select id="pSource" class="input">
@@ -81,14 +142,21 @@
 
     <div class="grid" id="productsList"></div>
 
+    <!-- نافذة تفاصيل المنتج والألوان -->
+    <div class="overlay" id="detailOverlay" onclick="closeDetail()">
+        <div class="sheet" onclick="event.stopPropagation()" id="sheetContent"></div>
+    </div>
+
     <script>
         const DB_NAME = "orderTrackerDB";
         const STORE_NAME = "appdata";
-        const ALL_SIZES = ["S", "M", "L", "XL", "XXL", "36", "38", "40", "42"];
+        const ALL_SIZES = ["FREE", "S", "M", "L", "XL", "XXL", "36", "38", "40", "42"];
         let selectedSizes = ["S", "M", "L", "XL"];
         let formColors = [];
         let db;
         let products = [];
+        let currentDetailId = null;
+        let activeColorId = null;
 
         function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 
@@ -225,25 +293,31 @@
         }
 
         function saveProduct() {
+            const category = document.getElementById('pCategory').value;
             const name = document.getElementById('pName').value.trim();
             const source = document.getElementById('pSource').value;
             if(!name) { alert('يرجى كتابة اسم المنتج'); return; }
 
             const newProduct = {
                 id: uid(),
+                category: category || "عام",
                 name,
                 source,
                 colors: formColors.filter(c => c.name.trim() !== "")
             };
 
             products.unshift(newProduct);
-            
+            persistAndRefresh();
+            document.getElementById('pName').value = "";
+            initForm();
+        }
+
+        function persistAndRefresh() {
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put(products, "products");
             tx.oncomplete = function() {
-                document.getElementById('pName').value = "";
-                initForm();
                 renderList();
+                if(currentDetailId) openDetail(currentDetailId);
             };
         }
 
@@ -255,20 +329,50 @@
             }, 0);
         }
 
+        function getStockStatus(p) {
+            const stock = totalStock(p);
+            if(stock === 0) return 'out';
+            if(stock <= 3) return 'low';
+            return 'available';
+        }
+
         function renderList() {
             const list = document.getElementById('productsList');
-            if(products.length === 0) {
-                list.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#8B7377; padding:20px;">لا توجد منتجات مسجلة حالياً</div>';
+            const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+            const categoryVal = document.getElementById('categoryFilter').value;
+            const sourceVal = document.getElementById('sourceFilter').value;
+            const stockVal = document.getElementById('stockFilter').value;
+
+            const filtered = products.filter(p => {
+                const cat = p.category || "";
+                const nameStr = (p.name + " " + cat).toLowerCase();
+                if(searchVal && !nameStr.includes(searchVal)) return false;
+                if(categoryVal !== 'all' && cat !== categoryVal) return false;
+                if(sourceVal !== 'all' && p.source !== sourceVal) return false;
+                if(stockVal !== 'all' && getStockStatus(p) !== stockVal) return false;
+                return true;
+            });
+
+            if(filtered.length === 0) {
+                list.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#8B7377; padding:20px;">لا توجد منتجات مطابقة للبحث</div>';
                 return;
             }
-            list.innerHTML = products.map(p => {
+            
+            list.innerHTML = filtered.map(p => {
                 const coverImg = p.colors && p.colors[0] && p.colors[0].images && p.colors[0].images[0];
+                const status = getStockStatus(p);
+                let badgeHTML = '';
+                if(status === 'out') badgeHTML = '<span class="badge badge-out">نفد</span>';
+                else if(status === 'low') badgeHTML = '<span class="badge badge-low">قليل</span>';
+
                 return `
-                    <div class="p-card">
+                    <div class="p-card" onclick="openDetail('${p.id}')">
                         ${coverImg ? `<img src="${coverImg}" class="p-img">` : `<div class="p-img">📷</div>`}
+                        ${badgeHTML}
                         <div class="p-info">
                             <div class="p-name">${p.name}</div>
-                            <div class="p-meta">${p.source} · متوفر ${totalStock(p)} قطعة</div>
+                            <span class="p-category">${p.category || 'عام'}</span>
+                            <div class="p-meta">${p.source} · ${totalStock(p)} قطعة</div>
                             <div style="margin-top:4px;">
                                 ${(p.colors || []).map(c => `<span class="swatch-dot" style="background:${c.hex}"></span>`).join(' ')}
                             </div>
@@ -276,6 +380,87 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function openDetail(id) {
+            currentDetailId = id;
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            if(!activeColorId || !p.colors.some(c => c.id === activeColorId)) {
+                activeColorId = p.colors[0] ? p.colors[0].id : null;
+            }
+            renderDetailSheet();
+            document.getElementById('detailOverlay').classList.add('show');
+        }
+
+        function closeDetail() {
+            document.getElementById('detailOverlay').classList.remove('show');
+            currentDetailId = null;
+        }
+
+        function renderDetailSheet() {
+            const p = products.find(x => x.id === currentDetailId);
+            if(!p) return;
+            const color = p.colors.find(c => c.id === activeColorId) || p.colors[0];
+            const img = color && color.images && color.images[0];
+
+            const sheet = document.getElementById('sheetContent');
+            sheet.innerHTML = `
+                <div class="sheet-header">
+                    <div>
+                        <div class="sheet-title">${p.name}</div>
+                        <span class="p-category">${p.category || 'عام'}</span>
+                    </div>
+                    <button onclick="deleteProduct('${p.id}')" style="background:none;border:none;cursor:pointer;font-size:18px;" title="حذف المنتج">🗑️</button>
+                </div>
+                
+                ${img ? `<img src="${img}" class="detail-img">` : `<div class="detail-img" style="display:flex;align-items:center;justify-content:center;color:#C9A9AF;">📷 لا توجد صورة لهذا اللون</div>`}
+                
+                <div style="font-size:12px; color:#8B7377; margin-bottom:8px;">المصدر: ${p.source} | إجمالي المخزون: ${totalStock(p)} قطعة</div>
+
+                <label class="label">الألوان المتاحة:</label>
+                <div class="color-picker-row">
+                    ${p.colors.map(c => `
+                        <div class="color-pill ${c.id === color.id ? 'active' : ''}" onclick="activeColorId='${c.id}'; renderDetailSheet();">
+                            <span class="swatch-dot" style="background:${c.hex}"></span>
+                            <span>${c.name}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                ${color ? `
+                    <label class="label">مقاسات وكميات لون (${color.name}):</label>${Object.keys(color.sizes || {}).length === 0 ? '<div style="font-size:12px; color:#8B7377;">لا توجد مقاسات محددة</div>' : 
+                    Object.keys(color.sizes).map(sz => `
+                        <div class="size-row">
+                            <span class="size-label" style="font-weight:800;">${sz}</span>
+                            <span style="font-size:13px; font-weight:700;">متوفر: ${color.sizes[sz]}</span>
+                            <div class="qty-control">
+                                <button class="qty-btn" onclick="adjustQty('${p.id}', '${color.id}', '${sz}', -1)">−</button>
+                                <span style="font-weight:800; min-width:20px; text-align:center;">${color.sizes[sz]}</span>
+                                <button class="qty-btn" onclick="adjustQty('${p.id}', '${color.id}', '${sz}', 1)">+</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                ` : ''}
+            `;
+        }
+
+        function adjustQty(pId, cId, size, delta) {
+            const p = products.find(x => x.id === pId);
+            if(!p) return;
+            const c = p.colors.find(x => x.id === cId);
+            if(!c || !c.sizes) return;
+            
+            const current = c.sizes[size] || 0;
+            c.sizes[size] = Math.max(0, current + delta);
+            persistAndRefresh();
+        }
+
+        function deleteProduct(id) {
+            if(!confirm('هل تريد حذف هذا المنتج نهائياً؟')) return;
+            products = products.filter(x => x.id !== id);
+            closeDetail();
+            persistAndRefresh();
         }
 
         init();
