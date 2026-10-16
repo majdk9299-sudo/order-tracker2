@@ -170,7 +170,7 @@
             </div>
         </div>
 
-        <label class="label">المقاسات المتاحة لهذا المنتج</label>
+        <label class="label">المقاسات (اضغط على المقاس لإضافته أو إزالته - الافتراضي FREE):</label>
         <div class="chip-group" id="sizeChips"></div>
         <div style="display: flex; gap: 6px; margin-top: 6px;">
             <input type="text" id="customSizeInput" class="input" placeholder="أضف مقاساً جديداً (مثل: XXL)" style="flex:1; padding:6px 10px; font-size:11px;">
@@ -181,7 +181,6 @@
         <input type="file" id="bulkImagesInput" accept="image/*" multiple style="display:none" onchange="handleBulkImages(this.files)">
         <button type="button" class="btn" style="background:#8A3A4C; margin-top:4px;" onclick="document.getElementById('bulkImagesInput').click()">📸 رفع صور الألوان دفعة واحدة</button>
 
-        <!-- الألوان المحفوظة مسبقاً مع زر مسح -->
         <div id="savedColorsSection" style="margin-top: 10px; display:none;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <label class="label" style="margin:0;">ألوانك المحفوظة السريعة:</label>
@@ -207,7 +206,7 @@
         const DB_NAME = "orderTrackerDB";
         const STORE_NAME = "appdata";
         let ALL_SIZES = ["FREE", "S", "M", "L", "XL", "XXL", "36", "38", "40", "42"];
-        let selectedSizes = ["S", "M", "L", "XL"];
+        let selectedSizes = ["FREE"]; // الافتراضي FREE فقط
         let formColors = [];
         let savedColorsLibrary = [];
         let db;
@@ -282,7 +281,6 @@
         function addColorToLibrary(name, hex) {
             if(!name || !name.trim()) return;
             const cleanName = name.trim();
-            // تجاهل الكلمات القصيرة جداً لمنع حفظ الحروف المقطعة
             if(cleanName.length < 2) return;
             
             if(!savedColorsLibrary.some(c => c.name.toLowerCase() === cleanName.toLowerCase())) {
@@ -338,7 +336,7 @@
             document.getElementById('pName').value = "";
             document.getElementById('weightFrom').value = "40";
             document.getElementById('weightTo').value = "65";
-            selectedSizes = ["S", "M", "L", "XL"];
+            selectedSizes = ["FREE"]; // يبدأ بـ FREE فقط
             renderSizeChips();
             formColors = [createColorObj()];
             renderColorRows();
@@ -373,7 +371,12 @@
             
             formColors.forEach(c => {
                 if(!c.sizes) c.sizes = {};
-                if(idx === -1 && c.sizes[s] === undefined) c.sizes[s] = 0;
+                // إذا تم إضافة مقاس جديد نعطيه قيمة 0 افتراضياً، وإذا أزيل نحذفه
+                if(idx === -1) {
+                    if(c.sizes[s] === undefined) c.sizes[s] = 0;
+                } else {
+                    delete c.sizes[s];
+                }
             });
             renderSizeChips();
             renderColorRows();
@@ -429,7 +432,6 @@
             container.innerHTML = formColors.map((c, i) => `
                 <div class="color-box">
                     <div class="color-header">
-                        <!-- تم تغيير oninput إلى onchange لكي لا يحفظ الحروف أثناء الكتابة الفردية -->
                         <input type="text" class="input" placeholder="اسم اللون (مثل: أحمر)" value="${c.name}" onchange="formColors[${i}].name=this.value; addColorToLibrary(this.value, formColors[${i}].hex);">
                         <input type="color" class="color-picker" value="${c.hex}" onchange="formColors[${i}].hex=this.value; addColorToLibrary(formColors[${i}].name, this.value);">
                         ${formColors.length > 1 ? `<button type="button" onclick="removeColorRow('${c.id}')" style="border:none;background:none;color:#B49AA0;font-size:16px;">✕</button>` : ''}
@@ -638,7 +640,7 @@
                     });
                 }
             });
-            if(selectedSizes.length === 0) selectedSizes = ["S", "M", "L", "XL"];
+            if(selectedSizes.length === 0) selectedSizes = ["FREE"];
 
             renderSizeChips();
             formColors = JSON.parse(JSON.stringify(p.colors || []));
