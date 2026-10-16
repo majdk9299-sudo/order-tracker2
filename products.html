@@ -25,8 +25,6 @@ body { min-height: 100vh; background: #FAF3F0; font-family: 'Tajawal', sans-seri
 .stat-num { font-size: 20px; font-weight: 800; color: #6B2737; }
 .stat-label { font-size: 11px; color: #8B7377; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-row { display: flex; gap: 8px; padding: 18px 20px 0; align-items: center; flex-wrap: wrap; }
-.filter-btn { border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-family: 'Tajawal', sans-serif; cursor: pointer; }
-.filter-btn.active { background: #6B2737; color: #FAF3F0; border-color: #6B2737; }
 .filter-icon-btn { margin-right: auto; position: relative; border: 1px solid #E7D3D6; background: #fff; color: #8B7377; border-radius: 999px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .filter-icon-btn.active { background: #F3DEE1; border-color: #D9A9AF; color: #6B2737; }
 .more-filters { display: none; gap: 8px; padding: 10px 20px 0; flex-wrap: wrap; }
@@ -100,14 +98,14 @@ body { min-height: 100vh; background: #FAF3F0; font-family: 'Tajawal', sans-seri
 <div id="app"></div>
 <script>
 const DB_NAME = "orderTrackerDB";
-const DB_VERSION = 2;
 const STORE_NAME = "appdata";
 let db;
 let products = [];
 
 function openDB() {
   return new Promise(function(resolve, reject) {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    // فتح DB بدون تحديد رقم Version لتلافي تعارض الإصدارات
+    const req = indexedDB.open(DB_NAME);
     req.onupgradeneeded = function(e) {
       const d = e.target.result;
       if (!d.objectStoreNames.contains(STORE_NAME)) {
@@ -118,19 +116,29 @@ function openDB() {
     req.onerror = function(e) { reject(e); };
   });
 }
+
 function loadProducts() {
   return new Promise(function(resolve) {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const req = tx.objectStore(STORE_NAME).get("products");
-    req.onsuccess = function() { resolve(req.result || []); };
-    req.onerror = function() { resolve([]); };
+    if (!db) return resolve([]);
+    try {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).get("products");
+      req.onsuccess = function() { resolve(req.result || []); };
+      req.onerror = function() { resolve([]); };
+    } catch(err) {
+      resolve([]);
+    }
   });
 }
+
 function persistProducts() {
   if (!db) return;
-  const tx = db.transaction(STORE_NAME, "readwrite");
-  tx.objectStore(STORE_NAME).put(products, "products");
+  try {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(products, "products");
+  } catch(e){}
 }
+
 async function initApp() {
   try {
     db = await openDB();
@@ -166,11 +174,13 @@ function newColorRow() {
   fSizes.forEach(function(s){ sizesObj[s] = 0; });
   return { id: uid(), name: "", hex: "#6B2737", sizes: sizesObj, images: [] };
 }
+
 function openForm() {
   fName = ""; fSource = "local"; fThreshold = "3"; fSizes = ["S","M","L","XL"];
   fColors = [newColorRow()];
   showForm = true; render();
 }
+
 function closeForm() { showForm = false; render(); }
 
 function toggleFSize(s) {
@@ -187,9 +197,11 @@ function toggleFSize(s) {
 
 function addColorRow() { fColors.push(newColorRow()); render(); }
 function removeColorRow(id) { fColors = fColors.filter(function(c){return c.id!==id;}); render(); }
+
 function updateColorField(id, field, val) {
   fColors = fColors.map(function(c){ return c.id===id ? Object.assign({}, c, {[field]: val}) : c; });
 }
+
 function updateColorSizeQty(colorId, size, qty) {
   fColors = fColors.map(function(c){
     if (c.id === colorId) {
@@ -240,6 +252,7 @@ function handleColorImages(colorId, files) {
     });
   });
 }
+
 function removeColorImage(colorId, idx) {
   fColors = fColors.map(function(c) {
     if (c.id !== colorId) return c;
@@ -279,7 +292,7 @@ function removeProduct(id) {
 function adjustSizeQty(productId, colorId, size, delta) {
   products = products.map(function(p) {
     if (p.id !== productId) return p;
-    return Object.assign({}, p, { colors: p.colors.map(function(c) {
+    return Object.assign({}, p, { colors: (p.colors || []).map(function(c) {
       if (c.id !== colorId) return c;
       const szs = Object.assign({}, c.sizes || {});
       const currentQty = szs[size] || 0;
@@ -297,20 +310,23 @@ function openDetail(id) {
   detailImgIdx = 0;
   render();
 }
+
 function closeDetail() { detailId = null; render(); }
 function selectDetailColor(cid) { detailColorId = cid; detailImgIdx = 0; render(); }
+
 function galleryNav(delta, images) {
   detailImgIdx = (detailImgIdx + delta + images.length) % images.length;
   render();
 }
 
 function colorStock(c) {
-  if (!c.sizes) return c.qty || 0;
+  if (!c) return 0;
+  if (!c.sizes) return parseInt(c.qty) || 0;
   return Object.values(c.sizes).reduce(function(a,b){return a+(parseInt(b)||0);}, 0);
 }
 
 function productStock(p) { 
-  if (!p.colors || !Array.isArray(p.colors)) return 0;
+  if (!p || !p.colors || !Array.isArray(p.colors)) return 0;
   return p.colors.reduce(function(s,c){ return s + colorStock(c); }, 0); 
 }
 
@@ -375,7 +391,8 @@ function render() {
       <select class="filter-select" onchange="stockFilter=this.value; render();">
         <option value="all" ${stockFilter==='all'?'selected':''}>الكل</option>
         <option value="available" ${stockFilter==='available'?'selected':''}>متوفر</option>
-        <option value="low" ${stockFilter==='low'?'selected':''}>شارف على النفاد</option>
+        <option va
+        lue="low" ${stockFilter==='low'?'selected':''}>شارف على النفاد</option>
         <option value="out" ${stockFilter==='out'?'selected':''}>نفد</option>
       </select>
     </div>
@@ -398,7 +415,7 @@ function render() {
           </div>
         </div>
         <div class="product-info">
-        <div class="product-name">${p.name || ''}</div>
+          <div class="product-name">${p.name || ''}</div>
           <div class="product-meta">${(SOURCES.find(function(s){return s.id===p.source;})\vert{}\vert{}{}).label\vert{}\vert{}''} ·${productStock(p)} قطعة</div>
         </div>
       </div>`;
@@ -544,6 +561,7 @@ function render() {
   document.getElementById('app').innerHTML = html;
 }
 
+// تشغيل التطبيق فوراً
 initApp();
 </script>
 </body>
