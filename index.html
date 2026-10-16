@@ -108,6 +108,7 @@
         const DB_NAME = "orderTrackerDB";
         const STORE_NAME = "appdata";
         let customers = [];
+        let catalogProducts = [];
         let db;
 
         function openDB() {
@@ -124,12 +125,35 @@
             });
         }
 
-        function loadCustomers() {
+        function loadAppData() {
             return new Promise(function(resolve) {
                 const tx = db.transaction(STORE_NAME, "readonly");
-                const req = tx.objectStore(STORE_NAME).get("customers");
-                req.onsuccess = function() { resolve(req.result || []); };
-                req.onerror = function() { resolve([]); };
+                const reqCust = tx.objectStore(STORE_NAME).get("customers");
+                const reqProd = tx.objectStore(STORE_NAME).get("products");
+                
+                let custs = [];
+                let prods = [];
+                let completed = 0;
+
+                reqCust.onsuccess = function() {
+                    custs = reqCust.result || [];
+                    completed++;
+                    if (completed === 2) resolve({ customers: custs, products: prods });
+                };
+                reqCust.onerror = function() {
+                    completed++;
+                    if (completed === 2) resolve({ customers: custs, products: prods });
+                };
+
+                reqProd.onsuccess = function() {
+                    prods = reqProd.result || [];
+                    completed++;
+                    if (completed === 2) resolve({ customers: custs, products: prods });
+                };
+                reqProd.onerror = function() {
+                    completed++;
+                    if (completed === 2) resolve({ customers: custs, products: prods });
+                };
             });
         }
 
@@ -139,12 +163,21 @@
             tx.objectStore(STORE_NAME).put(customers, "customers");
         }
 
+        function persistProducts() {
+            if (!db) return;
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            tx.objectStore(STORE_NAME).put(catalogProducts, "products");
+        }
+
         async function initApp() {
             try {
                 db = await openDB();
-                customers = await loadCustomers();
+                const data = await loadAppData();
+                customers = data.customers;
+                catalogProducts = data.products;
             } catch (e) {
                 customers = [];
+                catalogProducts = [];
             }
             render();
         }
@@ -183,6 +216,11 @@
         let formPaymentMethod = "";
         let paymentMethodPickerFor = null;
 
+        // Catalog selection state in form
+        let selectedCatalogProductId = "";
+        let selectedCatalogColorId = "";
+        let formSelectedColorName = "";
+
         // Customer edit (name / whatsapp)
         let editingCustomerId = null;
         let editName = "";
@@ -190,17 +228,14 @@
         let customerMenuFor = null;
 
         // Export / print
-        let exportScope = null; // 'all' | 'filtered' | {id, name}
+        let exportScope = null;
 
-        // Image viewer (supports multiple images per order)
-        let viewingGallery = null; // { images: [...], index: 0 }
+        // Image viewer
+        let viewingGallery = null;
 
-        // Pagination: how many orders to render at once (loads more on scroll)
         let visibleCount = 25;
         let hasMoreOrders = false;
-
-        // Editing an existing order (null = adding a new order)
-        let editingItemFor = null; // { custId, itemId }
+        let editingItemFor = null;
 
         function save() {
             persistCustomers();
@@ -261,7 +296,7 @@
                     });
                 }
             }
-            // تجميع الطلبات المفلترة فقط لحساب الإحصائيات العلوية ديناميكياً
+
             let filteredAllItems = [];
             for (let i = 0; i < visibleCustomers.length; i++) {
                 filteredAllItems = filteredAllItems.concat(visibleCustomers[i].items);
@@ -296,7 +331,7 @@
                             <div class="header-title">دفتر الطلبات</div>
                             <div class="header-sub">تابعي طلبات زبوناتك بدون ما تنسي شي</div>
                         </div>
-                        <a class="icon-btn" href="./products.html" style="background:rgba(250,243,240,0.15); border-radius:12px; width:38px; height:38px; color:#FAF3F0; font-size:17px; text-decoration:none; display:flex; align-items:center; justify-content:center;">🛍️</a>
+                        <a class="icon-btn" href="./products.html" style="background:rgba(250,243,240,0.15); border-radius:12px; width:38px; height:38px; color:#FAF3F0; font-size:17px; text-decoration:none; display:flex; align-items:center; justify-content:center;" title="الكتالوج">📦</a>
                         <button class="icon-btn" style="background:rgba(250,243,240,0.15); border-radius:12px; width:38px; height:38px; color:#FAF3F0; font-size:17px;" onclick="exportScope='menu'; render();">📤</button>
                     </div>
                     <div class="stats-row">
@@ -421,7 +456,7 @@
                                                         <button class="icon-btn" onclick="removeItem('${c.id}', '${it.id}')">🗑️</button>
                                                     </div>
                                                     <div style="flex: 1; min-width: 0; margin-top:8px;">
-                                                        ${it.size ? `<div class="card-size">المقاس: ${it.size}</div>` : ''}
+                                                        ${it.size ? `<div class="card-size">المقاس: ${it.size} ${it.colorName ? '· اللون: ' + it.colorName : ''}</div>` : ''}
                                                         <div class="tags-row">
                                                             ${it.deliveryPoint ? `<span class="meta-tag">📍 ${it.deliveryPoint}</span>` : ''}
                                                             ${it.supplier ? `<span class="meta-tag">🏷️ ${it.supplier}</span>` : ''}
@@ -481,6 +516,40 @@
                                 إضافة لـ: <strong>${(customers.find(function(c) { return c.id === targetCustomerId; }) || {}).name || ''}</strong>
                             </div>
                         `}
+
+                        <!-- ربط الطلب بمنتج من الكتالوج -->
+                        <label class="label">اختر المنتج من الكتالوج (اختياري)</label>
+                        <select class="input" onchange="onSelectCatalogProduct(this.value)">
+                            <option value="">-- اختر منتجاً من المخزون --</option>
+                            ${catalogProducts.map(function(p) {
+                                return `<option value="${p.id}" ${selectedCatalogProductId === p.id ? 'selected' : ''}>${p.category ? '[' + p.category + '] ' : ''}${p.name} (${p.source})</option>`;
+                            }).join('')}
+                        </select>
+
+                        ${selectedCatalogProductId ? (() => {
+                            const prod = catalogProducts.find(p => p.id === selectedCatalogProductId);
+                            if (!prod || !prod.colors || prod.colors.length === 0) return '';
+                            const activeColor = prod.colors.find(c => c.id === selectedCatalogColorId) || prod.colors[0];
+                            return `
+                                <div style="background:#FAF3F0; border:1px solid #E7D3D6; border-radius:12px; padding:10px; margin-top:10px;">
+                                    <label class="label" style="margin-top:0;">اختر اللون:</label>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+                                        ${prod.colors.map(col => `
+                                            <button type="button" class="filter-btn ${activeColor.id === col.id ? 'active' : ''}" style="font-size:11.5px; padding:4px 10px;" onclick="selectedCatalogColorId='${col.id}'; formSelectedColorName='${col.name}'; updateFormImagesFromColor('${prod.id}', '${col.id}'); render();">
+                                                ${col.name}
+                                            </button>
+                                        `).join('')}
+                                    </div>
+                                    <label class="label">اختر المقاس:</label>
+                                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                        ${Object.keys(activeColor.sizes || {}).map(sz => {
+                                            const qty = activeColor.sizes[sz];
+                                            return `<button type="button" class="filter-btn ${formSize === sz ? 'active' : ''}" style="font-size:11.5px; padding:4px 10px; ${qty <= 0 ? 'opacity:0.5;' : ''}" onclick="formSize='${sz}'; render();">${sz} (متوفر: ${qty})</button>`;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        })() : ''}
 
                         <label class="label">صور المنتج</label>
                         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleCameraImage(this)">
@@ -637,6 +706,32 @@
             }
         }
 
+        function onSelectCatalogProduct(prodId) {
+            selectedCatalogProductId = prodId;
+            if (!prodId) {
+                selectedCatalogColorId = "";
+                formSelectedColorName = "";
+                render();
+                return;
+            }
+            const p = catalogProducts.find(x => x.id === prodId);
+            if (p && p.colors && p.colors.length > 0) {
+                selectedCatalogColorId = p.colors[0].id;
+                formSelectedColorName = p.colors[0].name;
+                formImages = (p.colors[0].images || []).slice();
+            }
+            render();
+        }
+
+        function updateFormImagesFromColor(prodId, colorId) {
+            const p = catalogProducts.find(x => x.id === prodId);
+            if (!p) return;
+            const col = p.colors.find(c => c.id === colorId);
+            if (col && col.images) {
+                formImages = col.images.slice();
+            }
+        }
+
         function setStatusFilter(val) { statusFilter = val; visibleCount = 25; render(); }
         function toggleShowFilters() { showFilters = !showFilters; render(); }
         function toggleExpand(id) { expanded[id] = !(expanded[id] ?? true); render(); }
@@ -690,6 +785,9 @@
             formDeposit = "";
             formSupplier = "";
             formOrderDate = todayStr();
+            selectedCatalogProductId = "";
+            selectedCatalogColorId = "";
+            formSelectedColorName = "";
             render();
         }
 
@@ -713,6 +811,9 @@
                             formDeposit = it.deposit || "";
                             formSupplier = it.supplier || "";
                             formOrderDate = it.orderDate || todayStr();
+                            selectedCatalogProductId = "";
+                            selectedCatalogColorId = "";
+                            formSelectedColorName = it.colorName || "";
                             render();
                             return;
                         }
@@ -798,6 +899,20 @@
                 return;
             }
 
+            // خصم تلقائي من المخزون عند اختيار منتج ومقاس ولون من الكتالوج
+            if (selectedCatalogProductId && formSize && selectedCatalogColorId && !editingItemFor) {
+                const prod = catalogProducts.find(p => p.id === selectedCatalogProductId);
+                if (prod) {
+                    const col = prod.colors.find(c => c.id === selectedCatalogColorId);
+                    if (col && col.sizes && col.sizes[formSize] !== undefined) {
+                        if (col.sizes[formSize] > 0) {
+                            col.sizes[formSize] -= 1;
+                            persistProducts();
+                        }
+                    }
+                }
+            }
+
             if (editingItemFor) {
                 for (let i = 0; i < customers.length; i++) {
                     if (customers[i].id === editingItemFor.custId) {
@@ -805,6 +920,7 @@
                             if (customers[i].items[j].id === editingItemFor.itemId) {
                                 const it = customers[i].items[j];
                                 it.size = formSize.trim();
+                                it.colorName = formSelectedColorName.trim();
                                 it.images = formImages.slice();
                                 it.deliveryPoint = formDeliveryPoint.trim();
                                 it.paid = isPaid;
@@ -827,6 +943,7 @@
             const newItem = {
                 id: uid(),
                 size: formSize.trim(),
+                colorName: formSelectedColorName.trim(),
                 images: formImages.slice(),
                 status: "preparing",
                 deliveryPoint: formDeliveryPoint.trim(),
@@ -903,19 +1020,19 @@
                             const totalAmount = parseFloat(it.amount) || 0;
                             const currentDeposit = parseFloat(it.deposit) || 0;
                             const remaining = Math.max(totalAmount - currentDeposit, 0);
-                                    showCustomPrompt("أدخلي المبلغ المضاف كدفعة (المتبقي: " + remaining + "):", "", function(input) {
-            if (input === null || input === "") return;
-            const addedAmount = parseFloat(input);
-            if (!addedAmount || addedAmount <= 0) return;
-            const newDeposit = currentDeposit + addedAmount;
-            it.deposit = String(Math.min(newDeposit, totalAmount));
-            if (totalAmount > 0 && newDeposit >= totalAmount) {
-                paymentMethodPickerFor = { custId: custId, itemId: itemId };
-                save();
-            } else {
-                save();
-            }
-        });
+                            showCustomPrompt("أدخلي المبلغ المضاف كدفعة (المتبقي: " + remaining + "):", "", function(input) {
+                                if (input === null || input === "") return;
+                                const addedAmount = parseFloat(input);
+                                if (!addedAmount || addedAmount <= 0) return;
+                                const newDeposit = currentDeposit + addedAmount;
+                                it.deposit = String(Math.min(newDeposit, totalAmount));
+                                if (totalAmount > 0 && newDeposit >= totalAmount) {
+                                    paymentMethodPickerFor = { custId: custId, itemId: itemId };
+                                    save();
+                                } else {
+                                    save();
+                                }
+                            });
                         }
                     }
                 }
@@ -988,7 +1105,6 @@
             }
         }
 
-        // ---- Customer edit (name / whatsapp) ----
         function openEditCustomer(custId) {
             const c = customers.find(function(c) { return c.id === custId; });
             if (!c) return;
@@ -1016,7 +1132,6 @@
             save();
         }
 
-        // ---- WhatsApp ----
         function openWhatsApp(custId) {
             const c = customers.find(function(c) { return c.id === custId; });
             if (!c || !c.phone) return;
@@ -1025,7 +1140,6 @@
             window.open(`https://wa.me/${digits}?text=${msg}`, '_blank');
         }
 
-        // ---- Export / Print ----
         function getFilteredCustomers() {
             const query = searchQuery.trim().toLowerCase();
             const result = [];
@@ -1175,36 +1289,36 @@
             exportScope = null;
             render();
         }
+
         function showCustomPrompt(msg, def, cb) {
-    const modal = document.getElementById('customPromptModal');
-    const textEl = document.getElementById('customPromptText');
-    const inputEl = document.getElementById('customPromptInput');
-    const okBtn = document.getElementById('customPromptOk');
-    const cancelBtn = document.getElementById('customPromptCancel');
+            const modal = document.getElementById('customPromptModal');
+            const textEl = document.getElementById('customPromptText');
+            const inputEl = document.getElementById('customPromptInput');
+            const okBtn = document.getElementById('customPromptOk');
+            const cancelBtn = document.getElementById('customPromptCancel');
 
-    textEl.innerText = msg;
-    inputEl.value = def || '';
-    modal.classList.add('show');
-    setTimeout(function() { inputEl.focus(); }, 50);
+            textEl.innerText = msg;
+            inputEl.value = def || '';
+            modal.classList.add('show');
+            setTimeout(function() { inputEl.focus(); }, 50);
 
-    function close(result) {
-        modal.classList.remove('show');
-        document.removeEventListener('keydown', onKeyDown);
-        modal.onclick = null;
-        if (cb) cb(result);
-    }
-    function onKeyDown(e) {
-        if (e.key === 'Enter') close(inputEl.value);
-        if (e.key === 'Escape') close(null);
-    }
+            function close(result) {
+                modal.classList.remove('show');
+                document.removeEventListener('keydown', onKeyDown);
+                modal.onclick = null;
+                if (cb) cb(result);
+            }
+            function onKeyDown(e) {
+                if (e.key === 'Enter') close(inputEl.value);
+                if (e.key === 'Escape') close(null);
+            }
 
-    okBtn.onclick = function() { close(inputEl.value); };
-    cancelBtn.onclick = function() { close(null); };
-    modal.onclick = function(e) { if (e.target === modal) close(null); };
-    document.addEventListener('keydown', onKeyDown);
-}
+            okBtn.onclick = function() { close(inputEl.value); };
+            cancelBtn.onclick = function() { close(null); };
+            modal.onclick = function(e) { if (e.target === modal) close(null); };
+            document.addEventListener('keydown', onKeyDown);
+        }
 
-    
         initApp();
 
         if ("serviceWorker" in navigator) {
@@ -1213,17 +1327,17 @@
             });
         }
     </script>
-<div id="customPromptModal" class="custom-prompt-overlay">
-    <div class="custom-prompt-card">
-        <div class="custom-prompt-icon">💰</div>
-        <h3 id="customPromptTitle" class="custom-prompt-title">إضافة دفعة جديدة</h3>
-        <p id="customPromptText" class="custom-prompt-text"></p>
-        <input type="number" id="customPromptInput" placeholder="أدخل المبلغ..." class="custom-prompt-input" inputmode="decimal">
-        <div class="custom-prompt-actions">
-            <button id="customPromptCancel" class="custom-prompt-cancel">إلغاء</button>
-            <button id="customPromptOk" class="custom-prompt-ok">تأكيد</button>
+    <div id="customPromptModal" class="custom-prompt-overlay">
+        <div class="custom-prompt-card">
+            <div class="custom-prompt-icon">💰</div>
+            <h3 id="customPromptTitle" class="custom-prompt-title">إضافة دفعة جديدة</h3>
+            <p id="customPromptText" class="custom-prompt-text"></p>
+            <input type="number" id="customPromptInput" placeholder="أدخل المبلغ..." class="custom-prompt-input" inputmode="decimal">
+            <div class="custom-prompt-actions">
+                <button id="customPromptCancel" class="custom-prompt-cancel">إلغاء</button>
+                <button id="customPromptOk" class="custom-prompt-ok">تأكيد</button>
+            </div>
         </div>
     </div>
-</div>
 </body>
 </html>
