@@ -135,7 +135,10 @@ async function initApp() {
   try {
     db = await openDB();
     products = await loadProducts();
-  } catch (e) { products = []; }
+    if (!Array.isArray(products)) products = [];
+  } catch (e) { 
+    products = []; 
+  }
   render();
 }
 
@@ -174,10 +177,10 @@ function toggleFSize(s) {
   const i = fSizes.indexOf(s);
   if (i === -1) {
     fSizes.push(s);
-    fColors.forEach(function(c){ if(c.sizes[s] === undefined) c.sizes[s] = 0; });
+    fColors.forEach(function(c){ if(!c.sizes) c.sizes = {}; if(c.sizes[s] === undefined) c.sizes[s] = 0; });
   } else {
     fSizes.splice(i,1);
-    fColors.forEach(function(c){ delete c.sizes[s]; });
+    fColors.forEach(function(c){ if(c.sizes) delete c.sizes[s]; });
   }
   render();
 }
@@ -190,8 +193,9 @@ function updateColorField(id, field, val) {
 function updateColorSizeQty(colorId, size, qty) {
   fColors = fColors.map(function(c){
     if (c.id === colorId) {
-      const newSizes = Object.assign({}, c.sizes, {[size]: parseInt(qty)||0});
-      return Object.assign({}, c, { sizes: newSizes });
+      const szs = Object.assign({}, c.sizes || {});
+      szs[size] = parseInt(qty)||0;
+      return Object.assign({}, c, { sizes: szs });
     }
     return c;
   });
@@ -277,9 +281,10 @@ function adjustSizeQty(productId, colorId, size, delta) {
     if (p.id !== productId) return p;
     return Object.assign({}, p, { colors: p.colors.map(function(c) {
       if (c.id !== colorId) return c;
-      const currentQty = (c.sizes && c.sizes[size]) || 0;
-      const newSizes = Object.assign({}, c.sizes, { [size]: Math.max(0, currentQty + delta) });
-      return Object.assign({}, c, { sizes: newSizes });
+      const szs = Object.assign({}, c.sizes || {});
+      const currentQty = szs[size] || 0;
+      szs[size] = Math.max(0, currentQty + delta);
+      return Object.assign({}, c, { sizes: szs });
     })});
   });
   save();
@@ -288,7 +293,7 @@ function adjustSizeQty(productId, colorId, size, delta) {
 function openDetail(id) {
   detailId = id;
   const p = products.find(function(x){return x.id===id;});
-  detailColorId = p && p.colors[0] ? p.colors[0].id : null;
+  detailColorId = p && p.colors && p.colors[0] ? p.colors[0].id : null;
   detailImgIdx = 0;
   render();
 }
@@ -305,6 +310,7 @@ function colorStock(c) {
 }
 
 function productStock(p) { 
+  if (!p.colors || !Array.isArray(p.colors)) return 0;
   return p.colors.reduce(function(s,c){ return s + colorStock(c); }, 0); 
 }
 
@@ -316,8 +322,9 @@ function stockStatus(p) {
 }
 
 function render() {
-  const filtered = products.filter(function(p) {
-    if (search.trim() && p.name.toLowerCase().indexOf(search.trim().toLowerCase()) === -1) return false;
+  const safeProducts = Array.isArray(products) ? products : [];
+  const filtered = safeProducts.filter(function(p) {
+    if (search.trim() && p.name && p.name.toLowerCase().indexOf(search.trim().toLowerCase()) === -1) return false;
     if (sourceFilter !== "all" && p.source !== sourceFilter) return false;
     if (stockFilter !== "all") {
       const st = stockStatus(p);
@@ -328,8 +335,8 @@ function render() {
     return true;
   });
 
-  const lowCount = products.filter(function(p){return stockStatus(p)==="low";}).length;
-  const outCount = products.filter(function(p){return stockStatus(p)==="out";}).length;
+  const lowCount = safeProducts.filter(function(p){return stockStatus(p)==="low";}).length;
+  const outCount = safeProducts.filter(function(p){return stockStatus(p)==="out";}).length;
   const activeFilterCount = (sourceFilter!=="all"?1:0) + (stockFilter!=="all"?1:0);
 
   let html = `
@@ -342,7 +349,7 @@ function render() {
       </div>
     </div>
     <div class="stats-row">
-      <div class="stat-tag"><span class="stat-num">${products.length}</span><span class="stat-label">منتج</span></div>
+      <div class="stat-tag"><span class="stat-num">${safeProducts.length}</span><span class="stat-label">منتج</span></div>
       <div class="stat-tag" style="background:#FDF0D8;"><span class="stat-num" style="color:#8A6A1F;">${lowCount}</span><span class="stat-label" style="color:#8A6A1F;">شارف على النفاد</span></div>
       <div class="stat-tag" style="background:#FBE4E4;"><span class="stat-num" style="color:#9A3B3B;">${outCount}</span><span class="stat-label" style="color:#9A3B3B;">نفد</span></div>
     </div>
@@ -375,10 +382,11 @@ function render() {
   </div>
 
   <div class="grid">
-    ${filtered.length===0 ? `<div class="empty-state" style="grid-column:1/-1;">${products.length===0?'ما فيه منتجات بعد — أضيفي أول منتج':'ما فيه نتائج مطابقة'}</div>` :
+    ${filtered.length===0 ? `<div class="empty-state" style="grid-column:1/-1;">${safeProducts.length===0?'ما فيه منتجات بعد — أضيفي أول منتج':'ما فيه نتائج مطابقة'}</div>` :
     filtered.map(function(p) {
       const status = stockStatus(p);
-      const coverColor = p.colors.find(function(c){return c.images && c.images.length;});
+      const colorsList = Array.isArray(p.colors) ? p.colors : [];
+      const coverColor = colorsList.find(function(c){return c.images && c.images.length;});
       const cover = coverColor ? coverColor.images[0] : null;
       return `
       <div class="product-card" onclick="openDetail('${p.id}')">
@@ -386,11 +394,11 @@ function render() {
           ${cover ? `<img src="${cover}">` : '📷'}
           ${status!=='ok' ? `<span class="product-badge ${status==='out'?'badge-out':'badge-low'}">${status==='out'?'نفد':'شارف'}</span>` : ''}
           <div class="product-swatches">
-            ${p.colors.slice(0,4).map(function(c){return `<span class="product-swatch" style="background:${c.hex||'#6B2737'}"></span>`;}).join('')}
+            ${colorsList.slice(0,4).map(function(c){return `<span class="product-swatch" style="background:${c.hex||'#6B2737'}"></span>`;}).join('')}
           </div>
         </div>
         <div class="product-info">
-        <div class="product-name">${p.name}</div>
+        <div class="product-name">${p.name || ''}</div>
           <div class="product-meta">${(SOURCES.find(function(s){return s.id===p.source;})\vert{}\vert{}{}).label\vert{}\vert{}''} ·${productStock(p)} قطعة</div>
         </div>
       </div>`;
@@ -427,18 +435,20 @@ function render() {
         return `
         <div class="color-card">
           <div class="color-row-top">
-            <input class="input" style="flex:1;" placeholder="اسم اللون (مثلاً: أسود)" value="${c.name}" oninput="updateColorField('${c.id}','name',this.value)">
-            <input class="color-swatch-input" type="color" value="${c.hex}" onchange="updateColorField('${c.id}','hex',this.value)">
+            <input class="input" style="flex:1;" placeholder="اسم اللون (مثلاً: أسود)" value="${c.name \vert{}\vert{} ''}" oninput="updateColorField('${c.id}','name',this.value)">
+            <input class="color-swatch-input" type="color" value="${c.hex \vert{}\vert{} '#6B2737'}" onchange="updateColorField('${c.id}','hex',this.value)">
             ${fColors.length>1 ? `<button class="remove-color-btn" onclick="removeColorRow('${c.id}')">✕</button>` : ''}
           </div>
           
           <div style="margin-top:10px;">
             <span style="font-size:11.5px; color:#8B7377;">الكمية المتوفرة حسب كل مقاس:</span>
             ${fSizes.map(function(sz) {
+              const szs = c.sizes || {};
+              const q = szs[sz] !== undefined ? szs[sz] : 0;
               return `
               <div class="size-qty-row">
                 <span class="size-label">${sz}</span>
-                <input class="input" style="width:80px; text-align:center; padding:5px;" type="number" value="${c.sizes[sz]!==undefined?c.sizes[sz]:0}" oninput="updateColorSizeQty('${c.id}', '${sz}', this.value)">
+                <input class="input" style="width:80px; text-align:center; padding:5px;" type="number" value="${q}" oninput="updateColorSizeQty('${c.id}', '${sz}', this.value)">
               </div>`;
             }).join('')}
           </div>
@@ -462,16 +472,17 @@ function render() {
   </div>
   `;
 
-  const detailProduct = products.find(function(p){return p.id===detailId;});
+  const detailProduct = safeProducts.find(function(p){return p.id===detailId;});
   if (detailProduct) {
-    const color = detailProduct.colors.find(function(c){return c.id===detailColorId;}) || detailProduct.colors[0];
+    const detailColors = Array.isArray(detailProduct.colors) ? detailProduct.colors : [];
+    const color = detailColors.find(function(c){return c.id===detailColorId;}) || detailColors[0];
     const images = (color && color.images && color.images.length) ? color.images : [];
     
     html += `
     <div class="sheet-overlay show" onclick="closeDetail()">
       <div class="sheet" style="padding:0; overflow:hidden;" onclick="event.stopPropagation()">
         <div class="sheet-header" style="padding:14px 20px 0;">
-          <div class="sheet-title" style="font-size:17px;">${detailProduct.name}</div>
+          <div class="sheet-title" style="font-size:17px;">${detailProduct.name || ''}</div>
           <div style="display:flex; gap:14px; align-items:center;">
             <button class="icon-btn" onclick="removeProduct('${detailProduct.id}')">🗑️</button>
             <button class="icon-btn" onclick="closeDetail()">✕</button>
@@ -479,7 +490,7 @@ function render() {
         </div>
 
         <div class="detail-gallery">
-          ${images.length ? `<img src="${images[detailImgIdx]}">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#C9A9AF;font-size:30px;">📷 لا توجد صور لهذا اللون</div>'}
+          ${images.length ? `<img src="${images[detailImgIdx]}">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#C9A9AF;font-size:14px;">📷 لا توجد صور لهذا اللون</div>'}
           ${images.length>1 ? `
             <button class="gallery-nav prev" onclick="galleryNav(1, ${JSON.stringify(images).replace(/"/g,'&quot;')})">›</button>
             <button class="gallery-nav next" onclick="galleryNav(-1, ${JSON.stringify(images).replace(/"/g,'&quot;')})">‹</button>
@@ -495,21 +506,22 @@ function render() {
 
           <label class="label" style="margin-top:10px; font-weight:700;">الألوان المتاحة:</label>
           <div class="color-swatch-picker">
-            ${detailProduct.colors.map(function(c) {
+            ${detailColors.map(function(c) {
               const isActive = c.id === (color && color.id);
               return `
               <div class="swatch-item ${isActive ? 'active' : ''}" onclick="selectDetailColor('${c.id}')">
                 <span class="swatch-circle" style="background:${c.hex||'#6B2737'}"></span>
-                <span style="font-size:11px; font-weight:700; color:#2B1F22;">${c.name}</span>
+                <span style="font-size:11px; font-weight:700; color:#2B1F22;">${c.name || ''}</span>
               </div>`;
             }).join('')}
           </div>
 
           ${color ? `
-          <label class="label" style="margin-top:10px; font-weight:700;">مقاسات اللون (${color.name}):</label>
+          <label class="label" style="margin-top:10px; font-weight:700;">مقاسات اللون (${color.name || ''}):</label>
           <div class="size-grid">
             ${Object.keys(color.sizes || {}).map(function(sz) {
-              const q = color.sizes[sz] || 0;
+              const szs = color.sizes || {};
+              const q = szs[sz] || 0;
               return `
               <div class="size-card ${q===0 ? 'out' : ''}">
                 <div>
