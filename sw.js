@@ -1,4 +1,4 @@
-const CACHE_NAME = "order-tracker-v2"; // غيّر الرقم مع كل نشر جديد
+const CACHE_NAME = "order-tracker-v3"; // غيّر الرقم مع كل نشر جديد
 const SHELL_FILES = [
   "./",
   "./index.html",
