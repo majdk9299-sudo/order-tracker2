@@ -17,13 +17,16 @@
         .back-btn { display: inline-flex; align-items: center; background: #fff; color: #6B2737; padding: 6px 12px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 12px; border: 1px solid #E7D3D6; }
         .search-toggle-btn { background: #6B2737; color: #fff; border: none; padding: 6px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; font-family: 'Tajawal', sans-serif; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         
-        /* شريط البحث المنزلق / القابل للطي */
-        .filter-section { background: #fff; border-radius: 14px; padding: 12px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(107,39,55,0.08); display: none; transition: all 0.3s ease; border: 1px solid #E7D3D6; }
+        /* شريط البحث والفلترة */
+        .filter-section { background: #fff; border-radius: 14px; padding: 12px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(107,39,55,0.08); display: none; border: 1px solid #E7D3D6; }
         .filter-section.show { display: block; }
         .filter-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
         .filter-select { flex: 1 1 100px; padding: 6px 8px; border: 1px solid #E7D3D6; border-radius: 8px; font-family: 'Tajawal', sans-serif; font-size: 11px; background: #fff; color: #2B1F22; outline: none; }
         
-        .card { background: #fff; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(107,39,55,0.05); }
+        /* بطاقة إضافة منتج قابلة للطي */
+        .add-card-toggle { background: #6B2737; color: #fff; border-radius: 14px; padding: 14px; text-align: center; font-weight: 800; font-size: 14px; cursor: pointer; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(107,39,55,0.15); display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .card { background: #fff; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(107,39,55,0.05); display: none; border: 1px solid #E7D3D6; }
+        .card.show { display: block; }
         .card-title { color: #6B2737; font-size: 15px; font-weight: 800; margin-bottom: 10px; }
         
         .label { display: block; font-size: 11px; color: #8B7377; margin: 8px 0 3px; font-weight: 700; }
@@ -38,12 +41,14 @@
         .color-picker { width: 32px; height: 32px; border-radius: 6px; border: 1px solid #E7D3D6; padding: 0; background: none; flex-shrink: 0; cursor: pointer; }
         
         .size-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; background: #fff; padding: 4px 8px; border-radius: 6px; border: 1px solid #EFDEE0; }
-        .size-label { font-size: 11px; font-weight: 700; color: #6B2737; width: 40px; }
+        .size-label { font-size: 11px; font-weight: 700; color: #6B2737; width: 50px; }
         
         .upload-row { display: flex; gap: 6px; margin-top: 6px; }
         .upload-btn { flex: 1; border: 1px dashed #D9BEC3; background: #fff; border-radius: 8px; padding: 6px; font-size: 11px; color: #6B2737; cursor: pointer; font-family: 'Tajawal', sans-serif; text-align: center; }
         .thumb-strip { display: flex; gap: 4px; overflow-x: auto; margin-top: 6px; }
-        .thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; border: 1px solid #E7D3D6; flex-shrink: 0; }
+        .thumb-container { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
+        .thumb { width: 100%; height: 100%; border-radius: 6px; object-fit: cover; border: 1px solid #E7D3D6; }
+        .thumb-remove { position: absolute; top: -4px; left: -4px; background: #C53030; color: #fff; border: none; border-radius: 50%; width: 14px; height: 14px; font-size: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         
         .btn { background: #6B2737; color: #fff; border: none; padding: 10px; width: 100%; border-radius: 10px; font-weight: 700; font-family: 'Tajawal', sans-serif; font-size: 13px; cursor: pointer; margin-top: 10px; }
         .btn-outline { background: #fff; color: #6B2737; border: 1px dashed #D9BEC3; }
@@ -55,17 +60,19 @@
         .p-info { padding: 8px; }
         .p-name { font-size: 12px; font-weight: 800; color: #2B1F22; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
         
-        /* دمج نوع المنتج والمصدر بجانب بعضهما */
         .p-tags { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
         .p-badge-cat { background: #F3DEE1; color: #6B2737; font-size: 9.5px; font-weight: 800; padding: 2px 5px; border-radius: 4px; }
         .p-badge-src { background: #EAE2E4; color: #523F43; font-size: 9.5px; font-weight: 700; padding: 2px 5px; border-radius: 4px; }
         
-        .p-meta { font-size: 10px; color: #8B7377; display: flex; justify-content: space-between; align-items: center; }
+        .p-meta { font-size: 10px; color: #8B7377; display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
         .swatch-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #fff; display: inline-block; }
         
-        .badge { position: absolute; top: 6px; right: 6px; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 12px; }
+        .badge { position: absolute; top: 6px; right: 6px; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 12px; z-index: 2; }
         .badge-out { background: #FDE8E8; color: #C53030; }
         .badge-low { background: #FEFCBF; color: #975A16; }
+
+        /* زر التعديل السريع على البطاقة */
+        .p-edit-btn { position: absolute; top: 6px; left: 6px; background: rgba(255,255,255,0.9); border: 1px solid #E7D3D6; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; z-index: 3; color: #6B2737; }
 
         /* نافذة التفاصيل */
         .overlay { position: fixed; inset: 0; background: rgba(43,31,34,0.5); display: none; align-items: flex-end; z-index: 50; }
@@ -91,11 +98,11 @@
     <div class="header">
         <div class="header-title">
             <h1>كتالوج المنتجات والمخزون</h1>
-            <p>إدارة المنتجات والألوان والمقاسات</p>
+            <p>إدارة المنتجات والألوان والمقاسات والأوزان</p>
         </div>
     </div>
 
-    <!-- قسم البحث والفلترة القابل للطي (مثل دفتر الطلبات) -->
+    <!-- شريط البحث والفلترة القابل للطي -->
     <div class="filter-section" id="filterSection">
         <input type="text" id="searchInput" class="input" placeholder="🔍 ابحث بالاسم أو النوع..." oninput="renderList()">
         <div class="filter-row">
@@ -111,8 +118,8 @@
 
             <select id="sourceFilter" class="filter-select" onchange="renderList()">
                 <option value="all">الكل (المصدر)</option>
-                <option value="محلي">محلي</option>
                 <option value="خارجي">خارجي</option>
+                <option value="محلي">محلي</option>
             </select>
 
             <select id="stockFilter" class="filter-select" onchange="renderList()">
@@ -124,9 +131,16 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-title">إضافة منتج جديد</div>
+    <!-- بطاقة إضافة منتج قابلة للطي -->
+    <div class="add-card-toggle" onclick="toggleAddCard()">
+        <span id="addToggleIcon">➕</span> <span id="addToggleText">إضافة منتج جديد للكتالوج</span>
+    </div>
+
+    <div class="card" id="addProductCard">
+        <div class="card-title" id="formCardTitle">إضافة منتج جديد</div>
         
+        <input type="hidden" id="editProductId" value="">
+
         <div style="display: flex; gap: 8px;">
             <div style="flex:1;">
                 <label class="label">نوع المنتج</label>
@@ -142,8 +156,8 @@
             <div style="flex:1;">
                 <label class="label">المصدر</label>
                 <select id="pSource" class="input">
+                    <option value="خارجي" selected>خارجي</option>
                     <option value="محلي">محلي</option>
-                    <option value="خارجي">خارجي</option>
                 </select>
             </div>
         </div>
@@ -151,14 +165,29 @@
         <label class="label">اسم وتفاصيل المنتج</label>
         <input type="text" id="pName" class="input" placeholder="مثال: بجائم نسائي كت / فستان سهرة">
 
-        <label class="label">المقاسات المتاحة لهذا المنتج</label>
-        <div class="chip-group" id="sizeChips"></div>
+        <div style="display: flex; gap: 8px;">
+            <div style="flex:1;">
+                <label class="label">من وزن (كغ)</label>
+                <input type="number" id="weightFrom" class="input" value="40">
+            </div>
+            <div style="flex:1;">
+                <label class="label">إلى وزن (كغ)</label>
+                <input type="number" id="weightTo" class="input" value="65">
+            </div>
+        </div>
 
-        <label class="label">الألوان والمقاسات والصور</label>
+        <label class="label">المقاسات المتاحة لهذا المنتج (اضغط للاختيار أو أضف مقاساً جديداً)</label>
+        <div class="chip-group" id="sizeChips"></div>
+        <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <input type="text" id="customSizeInput" class="input" placeholder="أضف مقاساً جديداً (مثال: XXL)" style="flex:1; padding:6px 10px; font-size:11px;">
+            <button type="button" class="btn-outline" style="width:auto; padding:6px 12px; font-size:11px; border-radius:8px; margin-top:0;" onclick="addCustomSize()">+ إضافة</button>
+        </div>
+
+        <label class="label">الألوان والصور والكميات</label>
         <div id="colorsContainer"></div>
         <button class="btn btn-outline" onclick="addColorRow()" style="margin-top:6px;">+ إضافة لون آخر</button>
 
-        <button class="btn" onclick="saveProduct()">حفظ المنتج بالكتالوج</button>
+        <button class="btn" onclick="saveProduct()" id="saveBtnText">حفظ المنتج بالكتالوج</button>
     </div>
 
     <div class="grid" id="productsList"></div>
@@ -171,7 +200,7 @@
     <script>
         const DB_NAME = "orderTrackerDB";
         const STORE_NAME = "appdata";
-        const ALL_SIZES = ["FREE", "S", "M", "L", "XL", "XXL", "36", "38", "40", "42"];
+        let ALL_SIZES = ["FREE", "S", "M", "L", "XL", "XXL", "36", "38", "40", "42"];
         let selectedSizes = ["S", "M", "L", "XL"];
         let formColors = [];
         let db;
@@ -182,13 +211,33 @@
         function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 
         function toggleSearchSection() {
-            const sec = document.getElementById('filterSection');
-            sec.classList.toggle('show');
+            document.getElementById('filterSection').classList.toggle('show');
+        }
+
+        function toggleAddCard() {
+            const card = document.getElementById('addProductCard');
+            const icon = document.getElementById('addToggleIcon');
+            const text = document.getElementById('addToggleText');
+            card.classList.toggle('show');
+            if(card.classList.contains('show')) {
+                icon.innerText = "✕";
+                text.innerText = "إغلاق نموذج الإضافة";
+            } else {
+                icon.innerText = "➕";
+                text.innerText = "إضافة منتج جديد للكتالوج";
+                resetForm();
+            }
         }
 
         function openDB() {
             return new Promise(function(resolve, reject) {
-                const req = indexedDB.open(DB_NAME);
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = function(e) {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains(STORE_NAME)) {
+                        d.createObjectStore(STORE_NAME);
+                    }
+                };
                 req.onsuccess = function(e) { resolve(e.target.result); };
                 req.onerror = function(e) { reject(e); };
             });
@@ -211,9 +260,22 @@
         }
 
         function initForm() {
+            document.getElementById('editProductId').value = "";
+            document.getElementById('formCardTitle').innerText = "إضافة منتج جديد";
+            document.getElementById('saveBtnText').innerText = "حفظ المنتج بالكتالوج";
+            document.getElementById('pCategory').value = "بجائم";
+            document.getElementById('pSource').value = "خارجي";
+            document.getElementById('pName').value = "";
+            document.getElementById('weightFrom').value = "40";
+            document.getElementById('weightTo').value = "65";
+            selectedSizes = ["S", "M", "L", "XL"];
             renderSizeChips();
             formColors = [createColorObj()];
             renderColorRows();
+        }
+
+        function resetForm() {
+            initForm();
         }
 
         function createColorObj() {
@@ -231,12 +293,31 @@
 
         function toggleSize(s) {
             const idx = selectedSizes.indexOf(s);
-            if (idx > -1) selectedSizes.splice(idx, 1);
-            else selectedSizes.push(s);
+            if (idx > -1) {
+                if(selectedSizes.length <= 1) { alert('يجب اختيار مقاس واحد على الأقل'); return; }
+                selectedSizes.splice(idx, 1);
+            } else {
+                selectedSizes.push(s);
+            }
             
             formColors.forEach(c => {
                 if(!c.sizes) c.sizes = {};
                 if(idx === -1 && c.sizes[s] === undefined) c.sizes[s] = 0;
+            });
+            renderSizeChips();
+            renderColorRows();
+        }
+
+        function addCustomSize() {
+            const input = document.getElementById('customSizeInput');
+            const val = input.value.trim().toUpperCase();
+            if(!val) return;
+            if(!ALL_SIZES.includes(val)) ALL_SIZES.push(val);
+            if(!selectedSizes.includes(val)) selectedSizes.push(val);
+            input.value = "";
+            formColors.forEach(c => {
+                if(!c.sizes) c.sizes = {};
+                if(c.sizes[val] === undefined) c.sizes[val] = 0;
             });
             renderSizeChips();
             renderColorRows();
@@ -258,27 +339,32 @@
             container.innerHTML = formColors.map((c, i) => `
                 <div class="color-box">
                     <div class="color-header">
-                        <input type="text" class="input" placeholder="اسم اللون" value="${c.name}" oninput="formColors[${i}].name=this.value">
+                        <input type="text" class="input" placeholder="اسم اللون (مثل: أسود)" value="${c.name}" oninput="formColors[${i}].name=this.value">
                         <input type="color" class="color-picker" value="${c.hex}" onchange="formColors[${i}].hex=this.value">
                         ${formColors.length > 1 ? `<button type="button" onclick="removeColorRow('${c.id}')" style="border:none;background:none;color:#B49AA0;font-size:16px;">✕</button>` : ''}
                     </div>
                     
                     <div style="margin-top:6px;">
-                        <span style="font-size:10px; color:#8B7377;">كميات المقاسات:</span>
+                        <span style="font-size:10px; color:#8B7377;">كميات المقاسات لهذا اللون:</span>
                         ${selectedSizes.map(sz => `
                             <div class="size-row">
                                 <span class="size-label">${sz}</span>
-                                <input type="number" class="input" style="width:60px; padding:2px 4px; text-align:center;" value="${c.sizes[sz] || 0}" oninput="formColors[${i}].sizes['${sz}']=parseInt(this.value)||0">
+                                <input type="number" class="input" style="width:60px; padding:2px 4px; text-align:center;" value="${c.sizes[sz] !== undefined ? c.sizes[sz] : 0}" oninput="formColors[${i}].sizes['${sz}']=parseInt(this.value)||0">
                             </div>
                         `).join('')}
                     </div>
 
                     <input type="file" id="file_${c.id}" accept="image/*" multiple style="display:none" onchange="handleImages('${c.id}', this.files)">
                     <div class="upload-row">
-                        <button type="button" class="upload-btn" onclick="document.getElementById('file_${c.id}').click()">📷 صور اللون</button>
+                        <button type="button" class="upload-btn" onclick="document.getElementById('file_${c.id}').click()">📷 إرفاق صور متعددة للون</button>
                     </div>
                     <div class="thumb-strip">
-                        ${(c.images || []).map(img => `<img src="${img}" class="thumb">`).join('')}
+                        ${(c.images || []).map((img, imgIdx) => `
+                            <div class="thumb-container">
+                                <img src="${img}" class="thumb">
+                                <button type="button" class="thumb-remove" onclick="removeColorImage('${c.id}',${imgIdx})">✕</button>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `).join('');
@@ -312,29 +398,51 @@
             Array.from(files).forEach(file => {
                 compressImage(file, function(dataUrl) {
                     if (!c.images) c.images = [];
-                    if (c.images.length < 4) c.images.push(dataUrl);
+                    c.images.push(dataUrl);
                     renderColorRows();
                 });
             });
         }
 
+        function removeColorImage(colorId, imgIdx) {
+            const c = formColors.find(x => x.id === colorId);
+            if (!c || !c.images) return;
+            c.images.splice(imgIdx, 1);
+            renderColorRows();
+        }
+
         function saveProduct() {
+            const editId = document.getElementById('editProductId').value;
             const category = document.getElementById('pCategory').value;
             const name = document.getElementById('pName').value.trim();
             const source = document.getElementById('pSource').value;
+            const weightFrom = document.getElementById('weightFrom').value || "40";
+            const weightTo = document.getElementById('weightTo').value || "65";
+
             if(!name) { alert('يرجى كتابة اسم المنتج'); return; }
 
-            const newProduct = {
-                id: uid(),
+            const validColors = formColors.filter(c => c.name.trim() !== "");
+            if(validColors.length === 0) { alert('يرجى إضافة لون واحد على الأقل مع اسمه'); return; }
+
+            const productData = {
+                id: editId ? editId : uid(),
                 category: category || "عام",
                 name,
                 source,
-                colors: formColors.filter(c => c.name.trim() !== "")
+                weightFrom,
+                weightTo,
+                colors: validColors
             };
 
-            products.unshift(newProduct);
+            if(editId) {
+                const idx = products.findIndex(p => p.id === editId);
+                if(idx > -1) products[idx] = productData;
+            } else {
+                products.unshift(productData);
+            }
+
             persistAndRefresh();
-            document.getElementById('pName').value = "";
+            toggleAddCard();
             initForm();
         }
 
@@ -379,7 +487,12 @@
                 return true;
             });
 
-  list.innerHTML = filtered.map(p => {
+            if(filtered.length === 0) {
+                list.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#8B7377; padding:20px; font-size:12px;">لا توجد منتجات مطابقة للبحث</div>';
+                return;
+            }
+            
+            list.innerHTML = filtered.map(p => {
                 const coverImg = p.colors && p.colors[0] && p.colors[0].images && p.colors[0].images[0];
                 const status = getStockStatus(p);
                 let badgeHTML = '';
@@ -390,12 +503,14 @@
                     <div class="p-card" onclick="openDetail('${p.id}')">
                         ${coverImg ? `<img src="${coverImg}" class="p-img">` : `<div class="p-img">📷</div>`}
                         ${badgeHTML}
+                        <button class="p-edit-btn" onclick="event.stopPropagation(); editProduct('${p.id}')" title="تعديل المنتج">✏️</button>
                         <div class="p-info">
                             <div class="p-name">${p.name}</div>
                             <div class="p-tags">
                                 <span class="p-badge-cat">${p.category || 'عام'}</span>
                                 <span class="p-badge-src">${p.source}</span>
                             </div>
+                            <div style="font-size:9.5px; color:#6B2737; margin-bottom:2px;">⚖️ من ${p.weightFrom || 40} إلى ${p.weightTo || 65} كغ</div>
                             <div class="p-meta">
                                 <span>متوفر: ${totalStock(p)}</span>
                                 <div>
@@ -406,6 +521,44 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function editProduct(id) {
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            
+            document.getElementById('editProductId').value = p.id;
+            document.getElementById('formCardTitle').innerText = "تعديل بيانات المنتج";
+            document.getElementById('saveBtnText').innerText = "تحديث المنتج";
+            document.getElementById('pCategory').value = p.category || "بجائم";
+            document.getElementById('pSource').value = p.source || "خارجي";
+            document.getElementById('pName').value = p.name || "";
+            document.getElementById('weightFrom').value = p.weightFrom || "40";
+            document.getElementById('weightTo').value = p.weightTo || "65";
+
+            // استخراج المقاسات الموجودة في ألوان المنتج
+            selectedSizes = [];
+            (p.colors || []).forEach(c => {
+                if(c.sizes) {
+                    Object.keys(c.sizes).forEach(sz => {
+                        if(!selectedSizes.includes(sz)) selectedSizes.push(sz);
+                        if(!ALL_SIZES.includes(sz)) ALL_SIZES.push(sz);
+                    });
+                }
+            });
+            if(selectedSizes.length === 0) selectedSizes = ["S", "M", "L", "XL"];
+
+            renderSizeChips();
+
+            formColors = JSON.parse(JSON.stringify(p.colors || []));
+            if(formColors.length === 0) formColors = [createColorObj()];
+            renderColorRows();
+
+            const card = document.getElementById('addProductCard');
+            if(!card.classList.contains('show')) {
+                toggleAddCard();
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function openDetail(id) {
@@ -428,7 +581,7 @@
             const p = products.find(x => x.id === currentDetailId);
             if(!p) return;
             const color = p.colors.find(c => c.id === activeColorId) || p.colors[0];
-            const img = color && color.images && color.images[0];
+            const imgs = (color && color.images && color.images.length > 0) ? color.images : [];
 
             const sheet = document.getElementById('sheetContent');
             sheet.innerHTML = `
@@ -438,12 +591,20 @@
                         <div class="p-tags" style="margin-top:3px;">
                             <span class="p-badge-cat">${p.category || 'عام'}</span>
                             <span class="p-badge-src">${p.source}</span>
+                            <span class="p-badge-src" style="background:#FAF3F0; border:1px solid #E7D3D6;">⚖️ ${p.weightFrom || 40}-${p.weightTo || 65} كغ</span>
                         </div>
                     </div>
-                    <button onclick="deleteProduct('${p.id}')" style="background:none;border:none;cursor:pointer;font-size:18px;" title="حذف المنتج">🗑️</button>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="closeDetail(); editProduct('${p.id}')" style="background:none;border:none;cursor:pointer;font-size:16px;" title="تعديل">✏️</button>
+                        <button onclick="deleteProduct('${p.id}')" style="background:none;border:none;cursor:pointer;font-size:16px;" title="حذف">🗑️</button>
+                    </div>
                 </div>
                 
-                ${img ? `<img src="${img}" class="detail-img">` : `<div class="detail-img" style="display:flex;align-items:center;justify-content:center;color:#C9A9AF;">📷 لا توجد صورة لهذا اللون</div>`}
+                ${imgs.length > 0 ? `
+                    <div style="display:flex; gap:6px; overflow-x:auto; margin-bottom:10px;">
+                        ${imgs.map(img => `<img src="${img}" style="width:100%; aspect-ratio:3/4; border-radius:12px; object-fit:cover; background:#FBEDEE; flex-shrink:0;">`).join('')}
+                    </div>
+                ` : `<div class="detail-img" style="display:flex;align-items:center;justify-content:center;color:#C9A9AF;">📷 لا توجد صور لهذا اللون</div>`}
                 
                 <div style="font-size:11px; color:#8B7377; margin-bottom:8px;">إجمالي المخزون المتبقي: <b>${totalStock(p)} قطعة</b></div>
 
